@@ -1,0 +1,47 @@
+root_image_label:
+  id: root
+  data: https://via.placeholder.com/800x600/cccccc/666666?text=Sample+Image
+  orientation: 0
+
+cropped_image_inside_root_image:
+  - id: box1
+    data: https://via.placeholder.com/800x600/cccccc/666666?text=Sample+Image
+    parents: root
+    x_center: 0.3
+    y_center: 0.3
+    width_relative: 0.2
+    height_relative: 0.15
+    orientation: 0
+
+  - id: box2
+    data: https://via.placeholder.com/800x600/cccccc/666666?text=Sample+Image
+    parents: root
+    x_center: 0.7
+    y_center: 0.5
+    width_relative: 0.25
+    height_relative: 0.2
+    orientation: 0
+
+sub_cropped_image:
+  id: box3
+  data: https://via.placeholder.com/800x600/cccccc/666666?text=Sample+Image
+  parents: box1
+  x_center: 0.5
+  y_center: 0.7
+  width_relative: 0.15
+  height_relative: 0.12
+  orientation: 0
+
+text_draft:
+  - id: text1
+    data: Sample text for box 1
+    parents: box1
+
+  - id: text2
+    data: Draft text for box 2
+    parents: box2
+
+text:
+  id: text3
+  data: Final text for box 3
+  parents: box3
