@@ -1,0 +1,23 @@
+[project]
+name = "collectra_gui"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "James Q",email = "james.quang@pm.me"}
+]
+readme = "README.md"
+requires-python = "^3.12"
+dependencies = [
+    "pywebview (>=6.1,<7.0)",
+    "rich (>=14.2.0,<15.0.0)",
+    "pyyaml (>=6.0.3,<7.0.0)",
+    "typer (>=0.21.1,<0.22.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+collectra_gui = "collectra_gui.api:app"

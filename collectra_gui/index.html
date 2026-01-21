@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Annotation Viewer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        input[type="file"] {
+            padding: 10px;
+            border: 2px dashed #007bff;
+            border-radius: 4px;
+            background: #f8f9ff;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            background: #e8f0ff;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        .result.success {
+            border-left: 4px solid #28a745;
+        }
+        .result.error {
+            border-left: 4px solid #dc3545;
+            background: #fff5f5;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .main-content {
+            display: flex;
+            gap: 20px;
+        }
+        .image-panel {
+            flex: 0 0 600px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .image-panel h3 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .image-container {
+            width: 100%;
+            max-height: 600px;
+            overflow: auto;
+            background: #f0f0f0;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+        }
+        .image-container img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+        .image-placeholder {
+            color: #999;
+            font-style: italic;
+            text-align: center;
+            padding: 40px;
+        }
+        .table-panel {
+            flex: 1;
+            min-width: 0;
+        }
+        #myGrid {
+            height: 600px;
+            width: 100%;
+        }
+        .folder-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .folder-info .file-found {
+            color: #28a745;
+        }
+        .folder-info .file-missing {
+            color: #dc3545;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>    
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/@annotorious/annotorious@latest/dist/annotorious.css">
+    <script
+        src="https://cdn.jsdelivr.net/npm/@annotorious/annotorious@latest/dist/annotorious.js"></script>
+</head>
+<body>
+    <h1>Annotation Viewer</h1>
+
+    <div id="status" class="status disconnected">
+        Waiting for pywebview...
+    </div>
+
+    <div class="section">
+        <div class="input-group">
+            <label><strong>Select .grapto folder:</strong></label>
+            <button id="selectFolderBtn" onclick="selectFolder()" disabled>Select .grapto Folder</button>            
+        </div>
+        <div id="folderInfo" class="folder-info"></div>
+        <input type="hidden" id="yamlPath" value="">
+        <div id="loadResult" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="main-content">
+        <div class="image-panel">
+            <h3>Image Preview</h3>
+            <div class="image-container" id="imageContainer">
+                <div class="image-placeholder">No image loaded. Select a folder containing an image file.</div>
+            </div>
+        </div>
+        <div class="table-panel section">
+            <div id="myGrid" class="ag-theme-quartz"></div>
+        </div>
+    </div>
+
+    <script>
+
+        import { createImageAnnotator } from '@annotorious/annotorious';
+        import '@annotorious/annotorious/annotorious.css';
+
+        let apiReady = false;
+        let gridApi = null;
+        let selectedYamlPath = '';
+        let selectedImageFile = null;
+
+        const updateCellValue = async (params) => {
+            const nodeId = params.data.displaySourceId;
+            const newValue = params.newValue;
+            try {
+                const result = await window.pywebview.api.update_node_data(nodeId, newValue);
+                if (!result.success) {
+                    console.error('Failed to update node data:', result.error);
+                }
+                display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");
+                console.log(display_data);
+                gridApi.setGridOption('rowData', display_data);
+            } catch (e) {
+                console.error('Error updating node data:', e);
+            }
+        };
+
+        const columnDefs = [
+            { field: "id", headerName: "Node ID", filter: true, sortable: true, flex: 2 },
+            { field: "type", headerName: "Type", filter: true, sortable: true, flex: 1 },
+            {
+                field: "displayValue",
+                headerName: "Display Value",
+                filter: true,
+                sortable: true,
+                flex: 2,
+                editable: true,
+                onCellValueChanged: updateCellValue,
+                cellEditor: 'agLargeTextCellEditor',
+            },
+        ];
+
+        const gridOptions = {
+            columnDefs: columnDefs,
+            rowData: [],
+            defaultColDef: {
+                resizable: true,
+            },
+            rowSelection: 'single',
+            animateRows: true,
+        };
+
+        function initGrid() {
+            const gridDiv = document.getElementById('myGrid');
+            gridApi = agGrid.createGrid(gridDiv, gridOptions);
+        }
+
+        function showResult(elementId, data, isError = false) {
+            const el = document.getElementById(elementId);
+            el.style.display = 'block';
+            el.textContent = JSON.stringify(data, null, 2);
+            el.className = 'result ' + (isError ? 'error' : 'success');
+        }
+
+        async function selectFolder() {
+            if (!apiReady) {
+                showResult('loadResult', { error: 'API not ready' }, true);
+                return;
+            }
+
+            try {
+                const result = await window.pywebview.api.select_folder();
+
+                if (!result.success) {
+                    if (result.error !== 'No folder selected') {
+                        showResult('loadResult', { error: result.error }, true);
+                    }
+                    return;
+                }
+
+                const folderInfoEl = document.getElementById('folderInfo');
+                const folderName = result.folder_path.split(/[/\\]/).pop();
+                let infoHtml = `<strong>Folder:</strong> ${folderName}<br>`;
+
+                if (result.yaml_path) {
+                    const yamlName = result.yaml_path.split(/[/\\]/).pop();
+                    infoHtml += `<span class="file-found">YAML found: ${yamlName}</span><br>`;
+                    document.getElementById('yamlPath').value = result.yaml_path;
+                    selectedYamlPath = result.yaml_path;
+                } else {
+                    infoHtml += `<span class="file-missing">No YAML file found</span><br>`;
+                }
+
+                if (result.image_path) {
+                    const imageName = result.image_path.split(/[/\\]/).pop();
+                    infoHtml += `<span class="file-found">Image found: ${imageName}</span>`;
+                    await displayImageFromPath(result.image_path);
+                } else {
+                    infoHtml += `<span class="file-missing">No image file found</span>`;
+                    clearImage();
+                }
+
+                folderInfoEl.innerHTML = infoHtml;
+
+                if (result.yaml_path) {
+                    await loadYaml();
+                }
+
+            } catch (e) {
+                showResult('loadResult', { error: e.message }, true);
+            }
+        }
+
+        async function displayImageFromPath(imagePath) {
+            try {
+                const result = await window.pywebview.api.get_image_base64(imagePath);
+                if (result.success) {
+                    const container = document.getElementById('imageContainer');
+                    container.innerHTML = `<img src="${result.data}" alt="Loaded image">`;
+                } else {
+                    console.error('Failed to load image:', result.error);
+                    clearImage();
+                }
+            } catch (e) {
+                console.error('Error loading image:', e);
+                clearImage();
+            }
+        }
+
+        function displayImage(file) {
+            const container = document.getElementById('imageContainer');
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                container.innerHTML = `<img src="${e.target.result}" alt="Uploaded image">`;
+            };
+
+            reader.onerror = function() {
+                container.innerHTML = '<div class="image-placeholder">Error loading image</div>';
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        function clearImage() {
+            const container = document.getElementById('imageContainer');
+            container.innerHTML = '<div class="image-placeholder">No image loaded. Select a folder containing an image file.</div>';
+        }
+
+        async function loadGridData() {
+            try {
+                const result = await window.pywebview.api.get_all_nodes_for_grid();
+                if (result.success) {
+                    display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");
+                    gridApi.setGridOption('rowData', display_data);
+                } else {
+                    console.error('Failed to load grid data:', result.error);
+                }
+            } catch (e) {
+                console.error('Error loading grid data:', e);
+            }
+        }
+
+        async function loadYaml() {
+            const path = document.getElementById('yamlPath').value;
+            if (!path) {
+                showResult('loadResult', { error: 'No YAML file selected' }, true);
+                return;
+            }
+            try {
+                const result = await window.pywebview.api.load_yaml(path);
+                showResult('loadResult', result, !result.success);
+                if (result.success) {
+                    await loadGridData();
+                }
+            } catch (e) {
+                showResult('loadResult', { error: e.message }, true);
+            }
+        }
+
+        window.addEventListener('pywebviewready', function() {
+            apiReady = true;
+            const statusEl = document.getElementById('status');
+            statusEl.className = 'status connected';
+            statusEl.textContent = 'pywebview API ready';
+            document.getElementById('selectFolderBtn').disabled = false;            
+            initGrid();
+        });
+    </script>
+</body>
+</html>
