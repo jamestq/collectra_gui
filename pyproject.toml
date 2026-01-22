@@ -11,7 +11,7 @@ dependencies = [
     "pywebview (>=6.1,<7.0)",
     "rich (>=14.2.0,<15.0.0)",
     "pyyaml (>=6.0.3,<7.0.0)",
-    "typer (>=0.21.1,<0.22.0)"
+    "typer (>=0.21.1,<0.22.0)",
 ]
 
 
@@ -20,7 +20,9 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-collectra_gui = "collectra_gui.api:app"
+collectra_gui = "collectra_gui.api:app"   
 
 [tool.poetry.group.dev.dependencies]
 pyinstaller = "^6.0"
+pytest = "^9.0.2"
+sphinx = "^9.1.0"
