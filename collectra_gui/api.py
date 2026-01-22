@@ -20,7 +20,8 @@ from pathlib import Path
 from collectra_gui.lineage_display import AnnotationGraph, compute_display_value
 from rich import print
 
-app = typer.Typer() 
+app = typer.Typer()
+
 
 class Api:
     """
@@ -31,6 +32,12 @@ class Api:
     """
 
     def __init__(self):
+        """
+        Initialize the API instance.
+
+        Sets up the annotation graph, YAML path, and window reference.
+        All values are initially None until load_yaml() is called.
+        """
         self._graph: AnnotationGraph | None = None
         self._yaml_path: str | None = None
         self._window = None
@@ -50,9 +57,7 @@ class Api:
             return {"success": False, "error": "Window not initialized"}
 
         try:
-            result = self._window.create_file_dialog(
-                dialog_type=webview.FOLDER_DIALOG
-            )
+            result = self._window.create_file_dialog(dialog_type=webview.FOLDER_DIALOG)
 
             if not result or len(result) == 0:
                 return {"success": False, "error": "No folder selected"}
@@ -61,7 +66,16 @@ class Api:
 
             yaml_path = None
             image_path = None
-            image_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.tif', '.tiff')
+            image_extensions = (
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".bmp",
+                ".webp",
+                ".tif",
+                ".tiff",
+            )
 
             for filename in os.listdir(folder_path):
                 filepath = os.path.join(folder_path, filename)
@@ -70,7 +84,7 @@ class Api:
 
                 lower_name = filename.lower()
 
-                if lower_name.endswith(('.yaml', '.yml')) and yaml_path is None:
+                if lower_name.endswith((".yaml", ".yml")) and yaml_path is None:
                     yaml_path = filepath
 
                 if lower_name.endswith(image_extensions) and image_path is None:
@@ -80,7 +94,7 @@ class Api:
                 "success": True,
                 "folder_path": folder_path,
                 "yaml_path": yaml_path,
-                "image_path": image_path
+                "image_path": image_path,
             }
 
         except Exception as e:
@@ -99,26 +113,23 @@ class Api:
         try:
             extension = os.path.splitext(image_path)[1].lower()
             mime_types = {
-                '.png': 'image/png',
-                '.jpg': 'image/jpeg',
-                '.jpeg': 'image/jpeg',
-                '.gif': 'image/gif',
-                '.bmp': 'image/bmp',
-                '.webp': 'image/webp',
-                '.tif': 'image/tiff',
-                '.tiff': 'image/tiff'
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".gif": "image/gif",
+                ".bmp": "image/bmp",
+                ".webp": "image/webp",
+                ".tif": "image/tiff",
+                ".tiff": "image/tiff",
             }
-            mime_type = mime_types.get(extension, 'image/png')
+            mime_type = mime_types.get(extension, "image/png")
 
-            with open(image_path, 'rb') as f:
+            with open(image_path, "rb") as f:
                 image_data = f.read()
 
-            base64_data = base64.b64encode(image_data).decode('utf-8')
+            base64_data = base64.b64encode(image_data).decode("utf-8")
 
-            return {
-                "success": True,
-                "data": f"data:{mime_type};base64,{base64_data}"
-            }
+            return {"success": True, "data": f"data:{mime_type};base64,{base64_data}"}
 
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -140,15 +151,9 @@ class Api:
             self._graph = AnnotationGraph.from_yaml_data(yaml_data)
             self._yaml_path = path
 
-            return {
-                "success": True,                
-                "path": path
-            }
+            return {"success": True, "path": path}
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     def get_display_value(self, node_id: str) -> dict:
         """
@@ -161,24 +166,21 @@ class Api:
             dict with 'value', 'source_id', 'reason', or 'error'
         """
         if self._graph is None:
-            return {
-                "success": False,
-                "error": "No graph loaded. Call load_yaml first."
-            }
+            return {"success": False, "error": "No graph loaded. Call load_yaml first."}
 
         try:
-            value, source_id, reason = compute_display_value(self._graph, node_id)
+            value, source_id, crop_region, reason = compute_display_value(
+                self._graph, node_id
+            )
             return {
                 "success": True,
                 "value": value,
                 "source_id": source_id,
-                "reason": reason
+                "crop_region": crop_region,
+                "reason": reason,
             }
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     def get_all_nodes(self) -> dict:
         """
@@ -188,15 +190,9 @@ class Api:
             dict with 'nodes' list or 'error'
         """
         if self._graph is None:
-            return {
-                "success": False,
-                "error": "No graph loaded. Call load_yaml first."
-            }
+            return {"success": False, "error": "No graph loaded. Call load_yaml first."}
 
-        return {
-            "success": True,
-            "nodes": list(self._graph.nodes.keys())
-        }
+        return {"success": True, "nodes": list(self._graph.nodes.keys())}
 
     def get_node_info(self, node_id: str) -> dict:
         """
@@ -209,16 +205,10 @@ class Api:
             dict with node type, data, children, parents, or 'error'
         """
         if self._graph is None:
-            return {
-                "success": False,
-                "error": "No graph loaded. Call load_yaml first."
-            }
+            return {"success": False, "error": "No graph loaded. Call load_yaml first."}
 
         if node_id not in self._graph.nodes:
-            return {
-                "success": False,
-                "error": f"Node '{node_id}' not found"
-            }
+            return {"success": False, "error": f"Node '{node_id}' not found"}
 
         return {
             "success": True,
@@ -226,7 +216,7 @@ class Api:
             "type": self._graph.get_type(node_id),
             "data": self._graph.get_data(node_id),
             "children": self._graph.children(node_id),
-            "parents": self._graph.parents(node_id)
+            "parents": self._graph.parents(node_id),
         }
 
     def get_nodes_by_type(self, type_filter: str) -> dict:
@@ -240,21 +230,15 @@ class Api:
             dict with 'nodes' list of matching node IDs
         """
         if self._graph is None:
-            return {
-                "success": False,
-                "error": "No graph loaded. Call load_yaml first."
-            }
+            return {"success": False, "error": "No graph loaded. Call load_yaml first."}
 
         matching = [
-            node_id for node_id in self._graph.nodes
+            node_id
+            for node_id in self._graph.nodes
             if type_filter in self._graph.get_type(node_id)
         ]
 
-        return {
-            "success": True,
-            "nodes": matching,
-            "count": len(matching)
-        }
+        return {"success": True, "nodes": matching, "count": len(matching)}
 
     def get_display_values_for_type(self, type_filter: str) -> dict:
         """
@@ -267,29 +251,26 @@ class Api:
             dict with 'results' list of display value info
         """
         if self._graph is None:
-            return {
-                "success": False,
-                "error": "No graph loaded. Call load_yaml first."
-            }
+            return {"success": False, "error": "No graph loaded. Call load_yaml first."}
 
         results = []
         for node_id in self._graph.nodes:
             if type_filter in self._graph.get_type(node_id):
-                value, source_id, crop_region, reason = compute_display_value(self._graph, node_id)                
-                results.append({
-                    "node_id": node_id,
-                    "type": self._graph.get_type(node_id),
-                    "crop_region": crop_region,
-                    "value": value,
-                    "source_id": source_id,
-                    "reason": reason
-                })
+                value, source_id, crop_region, reason = compute_display_value(
+                    self._graph, node_id
+                )
+                results.append(
+                    {
+                        "node_id": node_id,
+                        "type": self._graph.get_type(node_id),
+                        "crop_region": crop_region,
+                        "value": value,
+                        "source_id": source_id,
+                        "reason": reason,
+                    }
+                )
 
-        return {
-            "success": True,
-            "results": results,
-            "count": len(results)
-        }
+        return {"success": True, "results": results, "count": len(results)}
 
     def get_all_nodes_for_grid(self) -> dict:
         """
@@ -303,21 +284,25 @@ class Api:
 
         rows = []
         for node_id in self._graph.nodes:
-            value, source_id, crop_region,reason = compute_display_value(self._graph, node_id)
-            rows.append({
-                "id": node_id,
-                "type": self._graph.get_type(node_id),
-                "data": str(self._graph.get_data(node_id)),
-                "displayValue": value,
-                "crop_region": crop_region,
-                "displaySourceId": source_id,
-                "reason": reason,
-                "parents": ", ".join(self._graph.parents(node_id)),
-                "children": ", ".join(self._graph.children(node_id)),
-            })
+            value, source_id, crop_region, reason = compute_display_value(
+                self._graph, node_id
+            )
+            rows.append(
+                {
+                    "id": node_id,
+                    "type": self._graph.get_type(node_id),
+                    "data": str(self._graph.get_data(node_id)),
+                    "displayValue": value,
+                    "crop_region": crop_region,
+                    "displaySourceId": source_id,
+                    "reason": reason,
+                    "parents": ", ".join(self._graph.parents(node_id)),
+                    "children": ", ".join(self._graph.children(node_id)),
+                }
+            )
 
         return {"success": True, "rows": rows}
-    
+
     def update_node_data(self, node_id: str, new_data: str) -> dict:
         """
         Update the data of a specific node.
@@ -330,6 +315,8 @@ class Api:
             dict with 'success' or 'error'
         """
         try:
+            if self._graph is None:
+                raise
             self._graph.set_data(node_id, new_data)
             self._save_to_yaml()
             return self.get_all_nodes_for_grid()
@@ -348,6 +335,8 @@ class Api:
             dict with 'success' and updated rows, or 'error'
         """
         try:
+            if self._graph is None:
+                raise ValueError("No graph loaded. Call load_yaml first.")
             self._graph.set_crop_region(node_id, crop_region)
             self._save_to_yaml()
             return self.get_all_nodes_for_grid()
@@ -385,13 +374,16 @@ class Api:
             crop_id = f"user_crop_{uuid.uuid4().hex[:8]}"
             text_id = f"user_text_{uuid.uuid4().hex[:8]}"
 
+            if self._yaml_path is None:
+                raise ValueError("YAML path is not set.")
+
             # Create ImageCrop node
             crop_data = {
                 "type": "collectra.ImageCrop",
                 "id": crop_id,
                 "parents": root_image_id,
-                "data": os.path.basename(self._yaml_path).replace('.yaml', '.jpg'),
-                **crop_region
+                "data": Path(self._yaml_path).parent.name.replace(".yaml", ".jpg"),
+                **crop_region,
             }
             self._graph.add_node("user_annotation", crop_id, crop_data)
 
@@ -400,7 +392,7 @@ class Api:
                 "type": "collectra.Text",
                 "id": text_id,
                 "parents": crop_id,
-                "data": ""
+                "data": "",
             }
             self._graph.add_node("user_annotation_text", text_id, text_data)
 
@@ -414,6 +406,12 @@ class Api:
     def delete_annotation(self, node_id: str) -> dict:
         """
         Delete an ImageCrop annotation and all its Text children.
+
+        Args:
+            node_id: The ImageCrop annotation ID to delete
+
+        Returns:
+            dict with updated grid data on success, or 'error' on failure
         """
         if self._graph is None:
             return {"success": False, "error": "No graph loaded. Call load_yaml first."}
@@ -442,10 +440,13 @@ class Api:
             raise ValueError("No YAML file loaded to save to.")
         yaml_data = self._graph.to_yaml_data()
         with open(self._yaml_path, "w") as f:
-            for key, value in yaml_data.items():                
-                yaml.dump({key: [value] if not isinstance(value, list) else value}, f, sort_keys=False)
-                f.write("\n")        
-        
+            for key, value in yaml_data.items():
+                yaml.dump(
+                    {key: [value] if not isinstance(value, list) else value},
+                    f,
+                    sort_keys=False,
+                )
+                f.write("\n")
 
     def get_lineage(self, node_id: str) -> dict:
         """
@@ -458,16 +459,10 @@ class Api:
             dict with 'ancestors' and 'descendants' lists
         """
         if self._graph is None:
-            return {
-                "success": False,
-                "error": "No graph loaded. Call load_yaml first."
-            }
+            return {"success": False, "error": "No graph loaded. Call load_yaml first."}
 
         if node_id not in self._graph.nodes:
-            return {
-                "success": False,
-                "error": f"Node '{node_id}' not found"
-            }
+            return {"success": False, "error": f"Node '{node_id}' not found"}
 
         # Get ancestors (traverse up)
         ancestors = []
@@ -478,10 +473,7 @@ class Api:
             if current in visited or current not in self._graph.nodes:
                 continue
             visited.add(current)
-            ancestors.append({
-                "id": current,
-                "type": self._graph.get_type(current)
-            })
+            ancestors.append({"id": current, "type": self._graph.get_type(current)})
             stack.extend(self._graph.parents(current))
 
         # Get descendants (traverse down)
@@ -493,23 +485,22 @@ class Api:
             if current in visited:
                 continue
             visited.add(current)
-            descendants.append({
-                "id": current,
-                "type": self._graph.get_type(current)
-            })
+            descendants.append({"id": current, "type": self._graph.get_type(current)})
             stack.extend(self._graph.children(current))
 
         return {
             "success": True,
             "node_id": node_id,
             "ancestors": ancestors,
-            "descendants": descendants
+            "descendants": descendants,
         }
+
 
 def get_resource_path(relative_path: str) -> str:
     """Get the path to a bundled resource, works for dev and PyInstaller."""
     import sys
-    if getattr(sys, 'frozen', False):
+
+    if getattr(sys, "frozen", False):
         # Running as PyInstaller bundle
         base_path = Path(sys._MEIPASS)
     else:
@@ -519,9 +510,7 @@ def get_resource_path(relative_path: str) -> str:
 
 
 @app.command()
-def start(
-    debug: bool = False
-):
+def start(debug: bool = False):
     """
     Create and start the pywebview window with the API.
 
@@ -531,11 +520,7 @@ def start(
     api = Api()
     html_path = get_resource_path("index.html")
     window = webview.create_window(
-        title="Annotation Display",
-        url=html_path,
-        js_api=api,
-        width=1200,
-        height=800
+        title="Annotation Display", url=html_path, js_api=api, width=1200, height=800
     )
 
     def on_started():
@@ -543,6 +528,7 @@ def start(
 
     webview.start(func=on_started, debug=debug)
     return window
+
 
 if __name__ == "__main__":
     app()
