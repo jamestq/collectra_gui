@@ -360,7 +360,7 @@ vite.config.ts.timestamp-*
 .vite/
 
 # AI tool files
-.github/agents
+.github/agents/
 .claude
 hooks
 
