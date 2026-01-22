@@ -141,9 +141,7 @@ class Api:
             self._yaml_path = path
 
             return {
-                "success": True,
-                "node_count": len(self._graph.nodes),
-                "edge_count": len(self._graph.edges),
+                "success": True,                
                 "path": path
             }
         except Exception as e:
@@ -355,7 +353,64 @@ class Api:
             return self.get_all_nodes_for_grid()
         except Exception as e:
             return {"success": False, "error": str(e)}
-    
+
+    def create_annotation(self, crop_region: dict) -> dict:
+        """
+        Create a new ImageCrop annotation with a Text child.
+
+        Args:
+            crop_region: dict with x_center, y_center, width_relative, height_relative
+
+        Returns:
+            dict with updated grid data or 'error'
+        """
+        if self._graph is None:
+            return {"success": False, "error": "No graph loaded. Call load_yaml first."}
+
+        try:
+            import uuid
+
+            # Find root Image node
+            root_image_id = None
+            for node_id in self._graph.nodes:
+                node_type = self._graph.get_type(node_id)
+                if "Image" in node_type and "ImageCrop" not in node_type:
+                    root_image_id = node_id
+                    break
+
+            if root_image_id is None:
+                return {"success": False, "error": "No root Image node found in graph."}
+
+            # Generate unique IDs
+            crop_id = f"user_crop_{uuid.uuid4().hex[:8]}"
+            text_id = f"user_text_{uuid.uuid4().hex[:8]}"
+
+            # Create ImageCrop node
+            crop_data = {
+                "type": "collectra.ImageCrop",
+                "id": crop_id,
+                "parents": root_image_id,
+                "data": os.path.basename(self._yaml_path).replace('.yaml', '.jpg'),
+                **crop_region
+            }
+            self._graph.add_node("user_annotation", crop_id, crop_data)
+
+            # Create Text child node
+            text_data = {
+                "type": "collectra.Text",
+                "id": text_id,
+                "parents": crop_id,
+                "data": ""
+            }
+            self._graph.add_node("user_annotation_text", text_id, text_data)
+
+            # Save and return updated grid
+            self._save_to_yaml()
+            return self.get_all_nodes_for_grid()
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def _save_to_yaml(self) -> None:
         """Save the current graph back to the original YAML file."""
         if self._yaml_path is None or self._graph is None:

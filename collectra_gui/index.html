@@ -323,26 +323,53 @@
                         fillOpacity: 0.1,
                         stroke: '#FFEA2E',
                         strokeOpacity: 1
-                    });
-                    console.log(anno);
-                    anno.on('clickAnnotation', function(annotation, originalEvent){
-                        console.log('Annotation clicked: ' + annotation.id);
-                    });
-                    anno.on('clickAnnotation', function(annotation, originalEvent){
-                        console.log('Annotation clicked: ' + annotation.id);
-                        if (gridApi && !syncingSelection) {
-                            syncingSelection = true;
-                            const rowNode = gridApi.getRowNode(annotation.id);
-                            if (rowNode) {
-                                rowNode.setSelected(true);
-                                gridApi.ensureNodeVisible(rowNode, 'middle');
+                    });                                        
+                    anno.on('selectionChanged', function(annotations, originalEvent){   
+                        try{
+                            if (gridApi && !syncingSelection && annotations.length > 0) {                            
+                                syncingSelection = true;
+                                let annotation = annotations[0];                            
+                                const rowNode = gridApi.getRowNode(annotation.id);
+                                if (rowNode) {
+                                    rowNode.setSelected(true);
+                                    gridApi.ensureNodeVisible(rowNode, 'middle');
+                                }
+                                syncingSelection = false;
                             }
+                        }catch(e){
                             syncingSelection = false;
-                        }
+                            console.error('Error in selectionChanged handler:', e);                            
+                        }finally{
+                            syncingSelection = false;
+                        }                                         
                     });
                     anno.on('updateAnnotation', function(updated, previous){
                         const geometry = updated.target.selector.geometry;
                         updateAnnotationCoordinates(updated.id, geometry);
+                    });
+                    anno.on('createAnnotation', async function(annotation) {
+                        const geometry = annotation.target.selector.geometry;
+                        const cropRegion = calculateCropRegionFromGeometry(geometry);
+
+                        try {
+                            const result = await window.pywebview.api.create_annotation(cropRegion);
+                            if (result.success) {
+                                // Update grid with new data
+                                const display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");
+                                gridApi.setGridOption('rowData', display_data);
+
+                                // Refresh annotations on image
+                                anno.clearAnnotations();
+                                display_data.forEach(row => {
+                                    const geom = calculateGeometryFromCropRegion(row.crop_region);
+                                    if (geom) anno.addAnnotation(createAnnotation(geom, row));
+                                });
+                            } else {
+                                console.error('Error creating annotation:', result.error);
+                            }
+                        } catch (e) {
+                            console.error('Error creating annotation:', e);
+                        }
                     });
                 } else {
                     console.error('Failed to load image:', result.error);
