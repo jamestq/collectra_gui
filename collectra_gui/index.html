@@ -102,7 +102,7 @@
             color: #721c24;
         }
         .main-content {
-            display: flex;
+            display: flex;            
             gap: 20px;
         }
         .image-panel {
@@ -160,6 +160,11 @@
             color: #dc3545;
         }
     </style>
+    <link rel="stylesheet" 
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
+      integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" 
+      crossorigin="anonymous" 
+      referrerpolicy="no-referrer" /> 
     <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>    
     <script src="https://cdn.jsdelivr.net/npm/@annotorious/annotorious@latest/dist/annotorious.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@annotorious/annotorious@latest/dist/annotorious.css">    
@@ -210,25 +215,64 @@
                 if (!result.success) {
                     console.error('Failed to update node data:', result.error);
                 }
-                display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");                
+                display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");
                 gridApi.setGridOption('rowData', display_data);
             } catch (e) {
                 console.error('Error updating node data:', e);
             }
         };
 
+        async function deleteAnnotation(nodeId) {
+            if (!confirm('Delete this annotation?')) return;
+
+            try {
+                const result = await window.pywebview.api.delete_annotation(nodeId);
+                if (result.success) {
+                    const display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");
+                    gridApi.setGridOption('rowData', display_data);
+
+                    // Refresh annotations on image
+                    anno.clearAnnotations();
+                    display_data.forEach(row => {
+                        const geom = calculateGeometryFromCropRegion(row.crop_region);
+                        if (geom) anno.addAnnotation(createAnnotation(geom, row));
+                    });
+                } else {
+                    console.error('Error deleting annotation:', result.error);
+                    alert('Failed to delete: ' + result.error);
+                }
+            } catch (e) {
+                console.error('Error deleting annotation:', e);
+                alert('Failed to delete annotation');
+            }
+        }
+
         const columnDefs = [
-            { field: "id", headerName: "Node ID", filter: true, sortable: true, flex: 2 },
+            { field: "id", headerName: "Node ID", filter: true, sortable: true, flex: 1 },
             { field: "type", headerName: "Type", filter: true, sortable: true, flex: 1 },
             {
                 field: "displayValue",
                 headerName: "Display Value",
                 filter: true,
                 sortable: true,
-                flex: 2,
+                flex: 3,
                 editable: true,
                 onCellValueChanged: updateCellValue,
                 cellEditor: 'agLargeTextCellEditor',
+            },
+            {
+                headerName: "",                
+                cellRenderer: (params) => {
+                    const btn = document.createElement('button');
+                    btn.innerHTML = '<i class="fa fa-trash"aria-hidden="true"></i>';
+                    btn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;color:red;';
+                    btn.title = 'Delete annotation';
+                    btn.onclick = () => deleteAnnotation(params.data.id);
+                    return btn;
+                },                
+                sortable: false,
+                filter: false,
+                flex: 1
             },
         ];
 

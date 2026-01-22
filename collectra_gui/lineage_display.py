@@ -120,7 +120,9 @@ class AnnotationGraph:
     def set_data(self, node_id: str, data: str) -> None:
         """Set data field of a node."""
         node = self.nodes.get(node_id)
-        if not node.get("data", ""):
+        if node is None:
+            raise ValueError(f"Node {node_id} not found.")
+        if "data" not in node:
             raise ValueError(f"Node {node_id} has no data field to set.")
         node["data"] = data
 
@@ -137,6 +139,25 @@ class AnnotationGraph:
         node["y_center"] = crop_region["y_center"]
         node["width_relative"] = crop_region["width_relative"]
         node["height_relative"] = crop_region["height_relative"]
+
+    def remove_node(self, node_id: str) -> None:
+        """Remove a node and all edges connected to it."""
+        if node_id not in self.nodes:
+            raise ValueError(f"Node {node_id} not found.")
+
+        # Remove from nodes dict
+        del self.nodes[node_id]
+
+        # Remove from label lookup
+        if node_id in self.label_lookup:
+            del self.label_lookup[node_id]
+
+        # Remove all edges involving this node
+        self.edges = {(p, c) for p, c in self.edges if p != node_id and c != node_id}
+
+        # Invalidate cached indexes
+        self._children_index.clear()
+        self._parents_index.clear()
 
     def children_of_type(self, node_id: str, type_substr: str) -> list[str]:
         """Get immediate children containing type_substr in their type."""

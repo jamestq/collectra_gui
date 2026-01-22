@@ -411,6 +411,31 @@ class Api:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def delete_annotation(self, node_id: str) -> dict:
+        """
+        Delete an ImageCrop annotation and all its Text children.
+        """
+        if self._graph is None:
+            return {"success": False, "error": "No graph loaded. Call load_yaml first."}
+
+        try:
+            # Get all Text children before deleting the ImageCrop
+            text_children = self._graph.children_of_type(node_id, "Text")
+
+            # Delete Text children first
+            for text_id in text_children:
+                self._graph.remove_node(text_id)
+
+            # Delete the ImageCrop node
+            self._graph.remove_node(node_id)
+
+            # Save and return updated grid
+            self._save_to_yaml()
+            return self.get_all_nodes_for_grid()
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def _save_to_yaml(self) -> None:
         """Save the current graph back to the original YAML file."""
         if self._yaml_path is None or self._graph is None:
