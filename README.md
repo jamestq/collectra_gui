@@ -31,17 +31,12 @@ cd collectra_gui
 
 # Install dependencies
 poetry install
-
-# Run the application
-poetry run collectra_gui start
 ```
-
-## Usage
 
 After installation, run:
 
 ```bash
-collectra_gui start
+collectra_gui
 ```
 
 This opens the GUI window where you can:
@@ -55,7 +50,7 @@ This opens the GUI window where you can:
 ### Running in Debug Mode
 
 ```bash
-poetry run collectra_gui start --debug
+poetry run collectra_gui --debug
 ```
 
 ### Building from Source
