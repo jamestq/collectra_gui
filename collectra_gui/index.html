@@ -200,6 +200,7 @@
         let selectedYamlPath = '';
         let selectedImageFile = null;
         let anno = null;
+        let syncingSelection = false;
 
         const updateCellValue = async (params) => {
             const nodeId = params.data.displaySourceId;
@@ -239,6 +240,14 @@
             },
             rowSelection: 'single',
             animateRows: true,
+            getRowId: (params) => params.data.id,
+            onRowSelected: (event) => {
+                if (event.node.isSelected() && anno && !syncingSelection) {
+                    syncingSelection = true;
+                    anno.setSelected(event.data.id);
+                    syncingSelection = false;
+                }
+            },
         };
 
         function initGrid() {
@@ -308,15 +317,32 @@
                 if (result.success) {
                     const container = document.getElementById('imageContainer');
                     container.innerHTML = `<img id="uploadedImage" src="${result.data}" alt="Loaded image">`;
-                    anno = Annotorious.createImageAnnotator('uploadedImage');
-                    anno.on('clickAnnotation', (annotation, originalEvent) => {
-                        console.log('Annotation clicked: ' + annotation.id);
-                    });
+                    anno = Annotorious.createImageAnnotator('uploadedImage');                    
                     anno.setStyle({
                         fill: '#FFEA2E',
                         fillOpacity: 0.1,
                         stroke: '#FFEA2E',
                         strokeOpacity: 1
+                    });
+                    console.log(anno);
+                    anno.on('clickAnnotation', function(annotation, originalEvent){
+                        console.log('Annotation clicked: ' + annotation.id);
+                    });
+                    anno.on('clickAnnotation', function(annotation, originalEvent){
+                        console.log('Annotation clicked: ' + annotation.id);
+                        if (gridApi && !syncingSelection) {
+                            syncingSelection = true;
+                            const rowNode = gridApi.getRowNode(annotation.id);
+                            if (rowNode) {
+                                rowNode.setSelected(true);
+                                gridApi.ensureNodeVisible(rowNode, 'middle');
+                            }
+                            syncingSelection = false;
+                        }
+                    });
+                    anno.on('updateAnnotation', function(updated, previous){
+                        const geometry = updated.target.selector.geometry;
+                        updateAnnotationCoordinates(updated.id, geometry);
                     });
                 } else {
                     console.error('Failed to load image:', result.error);
@@ -336,14 +362,46 @@
         function calculateGeometryFromCropRegion(cropRegion) {
             if (!cropRegion) return null;
             const image_div = document.querySelector("#uploadedImage");
-            console.log(image_div);
             const imgWidth = image_div.naturalWidth;
-            const imgHeight = image_div.naturalHeight;                   
+            const imgHeight = image_div.naturalHeight;
             let x = (cropRegion["x_center"] - cropRegion["width_relative"]/2)*imgWidth;
             let y = (cropRegion["y_center"] - cropRegion["height_relative"]/2)*imgHeight;
             let width = cropRegion["width_relative"]*imgWidth;
-            let height = cropRegion["height_relative"]*imgHeight;                     
+            let height = cropRegion["height_relative"]*imgHeight;
             return {x, y, width, height};
+        }
+
+        function calculateCropRegionFromGeometry(geometry) {
+            const image_div = document.querySelector("#uploadedImage");
+            const imgWidth = image_div.naturalWidth;
+            const imgHeight = image_div.naturalHeight;
+            const width_relative = geometry.w / imgWidth;
+            const height_relative = geometry.h / imgHeight;
+            const x_center = (geometry.x / imgWidth) + (width_relative / 2);
+            const y_center = (geometry.y / imgHeight) + (height_relative / 2);
+            return { x_center, y_center, width_relative, height_relative };
+        }
+
+        async function updateAnnotationCoordinates(annotationId, geometry) {
+            const cropRegion = calculateCropRegionFromGeometry(geometry);
+            try {
+                const result = await window.pywebview.api.update_node_coordinates(annotationId, cropRegion);
+                if (!result.success) {
+                    console.error('Failed to update annotation coordinates:', result.error);
+                    return;
+                }
+                const display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");
+                gridApi.setGridOption('rowData', display_data);
+                // Reload annotations on the image
+                anno.clearAnnotations();
+                display_data.forEach(row => {
+                    const geom = calculateGeometryFromCropRegion(row.crop_region);
+                    if (!geom) return;
+                    anno.addAnnotation(createAnnotation(geom, row));
+                });
+            } catch (e) {
+                console.error('Error updating annotation coordinates:', e);
+            }
         }
 
         function createAnnotation(geometry, data) {
@@ -382,11 +440,7 @@
                     anno.clearAnnotations();                                                
                     display_data.forEach(row => {                        
                         const geometry = calculateGeometryFromCropRegion(row.crop_region);
-                        if (!geometry) {
-                            console.log('No geometry for:', row.id);
-                            return;
-                        }                        
-                        console.log('Adding annotation for:', row.id);        
+                        if (!geometry) return;                                                          
                         anno.addAnnotation(createAnnotation(geometry, row));
                     });
                 } else {

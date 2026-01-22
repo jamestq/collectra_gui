@@ -124,6 +124,20 @@ class AnnotationGraph:
             raise ValueError(f"Node {node_id} has no data field to set.")
         node["data"] = data
 
+    def set_crop_region(self, node_id: str, crop_region: dict[str, float]) -> None:
+        """Set crop region fields of a node (x_center, y_center, width_relative, height_relative)."""
+        node = self.nodes.get(node_id)
+        if node is None:
+            raise ValueError(f"Node {node_id} not found.")
+        required_fields = ["x_center", "y_center", "width_relative", "height_relative"]
+        for field in required_fields:
+            if field not in crop_region:
+                raise ValueError(f"Missing required field: {field}")
+        node["x_center"] = crop_region["x_center"]
+        node["y_center"] = crop_region["y_center"]
+        node["width_relative"] = crop_region["width_relative"]
+        node["height_relative"] = crop_region["height_relative"]
+
     def children_of_type(self, node_id: str, type_substr: str) -> list[str]:
         """Get immediate children containing type_substr in their type."""
         return [
@@ -196,26 +210,27 @@ def compute_display_value(graph: AnnotationGraph, node_id: str) -> tuple[str, st
     node_type = graph.get_type(node_id)
 
     # Rule: Image type displays empty
-    if "Image" in node_type and "ImageCrop" not in node_type:
+    if "Image" in node_type and "ImageCrop" not in node_type:        
         return ("", "", None, f"{node_id} is of collectra.Image type: display blank")
 
     # Rules for ImageCrop
     if "ImageCrop" in node_type:
+        crop_data = graph.get_crop_region(node_id)
+
         # Rule 1: Container crop (has ImageCrop children)
         if graph.children_of_type(node_id, "ImageCrop"):
-            return ("", "", None, f"{node_id} is a container crop: display blank")
+            return ("", "", crop_data, f"{node_id} is a container crop: display blank")
 
         # Rule 2: Leaf crop with Text child
         text_children = graph.children_of_type(node_id, "Text")        
         text_children = text_children[0] if text_children else ""
         if text_children:
             deepest_id = graph.find_deepest(text_children, "Text")
-            deepest_data = graph.get_data(deepest_id) if deepest_id else ""
-            crop_data = graph.get_crop_region(node_id)
+            deepest_data = graph.get_data(deepest_id) if deepest_id else ""            
             return (deepest_data, deepest_id, crop_data, f"Leaf crop {node_id} with Text child: deepest Text is {deepest_id}")
 
         # Rule 3: Leaf crop without Text child
-        return ("", "", None, f"Leaf crop {node_id} without Text child")
+        return ("", "", crop_data, f"Leaf crop {node_id} without Text child")
 
     # Text elements (for completeness)
     if "Text" in node_type:

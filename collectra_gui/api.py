@@ -332,7 +332,25 @@ class Api:
             dict with 'success' or 'error'
         """
         try:
-            self._graph.set_data(node_id, new_data)                        
+            self._graph.set_data(node_id, new_data)
+            self._save_to_yaml()
+            return self.get_all_nodes_for_grid()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def update_node_coordinates(self, node_id: str, crop_region: dict) -> dict:
+        """
+        Update the crop region coordinates of a specific node.
+
+        Args:
+            node_id: The annotation ID
+            crop_region: dict with x_center, y_center, width_relative, height_relative
+
+        Returns:
+            dict with 'success' and updated rows, or 'error'
+        """
+        try:
+            self._graph.set_crop_region(node_id, crop_region)
             self._save_to_yaml()
             return self.get_all_nodes_for_grid()
         except Exception as e:
