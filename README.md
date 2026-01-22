@@ -4,19 +4,7 @@ A desktop application for viewing and editing annotation data with an interactiv
 
 ## Installation
 
-### One-line Install (No Python Required)
-
-**macOS / Linux:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/jamestq/collectra_gui/main/install.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/jamestq/collectra_gui/main/install.ps1 | iex
-```
-
-### Manual Download
+### Option 1: Download Pre-built Binary
 
 Download the latest release for your platform from the [Releases page](https://github.com/jamestq/collectra_gui/releases):
 
@@ -26,6 +14,27 @@ Download the latest release for your platform from the [Releases page](https://g
 | macOS (Intel) | `collectra_gui-macos-x86_64` |
 | macOS (Apple Silicon) | `collectra_gui-macos-arm64` |
 | Linux | `collectra_gui-linux-x86_64` |
+
+After downloading, make the binary executable (macOS/Linux):
+```bash
+chmod +x collectra_gui-*
+```
+
+### Option 2: Install via Python/Poetry
+
+For development or if you prefer installing from source:
+
+```bash
+# Clone the repository
+git clone https://github.com/jamestq/collectra_gui.git
+cd collectra_gui
+
+# Install dependencies
+poetry install
+
+# Run the application
+poetry run collectra_gui start
+```
 
 ## Usage
 
@@ -43,26 +52,15 @@ This opens the GUI window where you can:
 
 ## Development
 
-### Prerequisites
-
-- Python 3.12+
-- Poetry
-
-### Setup
+### Running in Debug Mode
 
 ```bash
-# Clone the repository
-git clone https://github.com/jamestq/collectra_gui.git
-cd collectra_gui
-
-# Install dependencies
-poetry install
-
-# Run in development mode
 poetry run collectra_gui start --debug
 ```
 
 ### Building from Source
+
+To create a standalone executable:
 
 ```bash
 # Install dev dependencies
@@ -73,19 +71,3 @@ poetry run pyinstaller collectra_gui.spec --clean
 ```
 
 The built executable will be in the `dist/` directory.
-
-## Uninstall
-
-**macOS / Linux:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/jamestq/collectra_gui/main/install.sh | bash -s -- uninstall
-```
-
-**Windows (PowerShell):**
-```powershell
-& { irm https://raw.githubusercontent.com/jamestq/collectra_gui/main/install.ps1 } -Action uninstall
-```
-
-Or manually delete the binary from:
-- macOS/Linux: `~/.local/bin/collectra_gui`
-- Windows: `%LOCALAPPDATA%\collectra_gui\collectra_gui.exe`
