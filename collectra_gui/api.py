@@ -277,10 +277,11 @@ class Api:
         results = []
         for node_id in self._graph.nodes:
             if type_filter in self._graph.get_type(node_id):
-                value, source_id, reason = compute_display_value(self._graph, node_id)
+                value, source_id, crop_region, reason = compute_display_value(self._graph, node_id)                
                 results.append({
                     "node_id": node_id,
                     "type": self._graph.get_type(node_id),
+                    "crop_region": crop_region,
                     "value": value,
                     "source_id": source_id,
                     "reason": reason
@@ -304,12 +305,13 @@ class Api:
 
         rows = []
         for node_id in self._graph.nodes:
-            value, source_id, reason = compute_display_value(self._graph, node_id)
+            value, source_id, crop_region,reason = compute_display_value(self._graph, node_id)
             rows.append({
                 "id": node_id,
                 "type": self._graph.get_type(node_id),
                 "data": str(self._graph.get_data(node_id)),
                 "displayValue": value,
+                "crop_region": crop_region,
                 "displaySourceId": source_id,
                 "reason": reason,
                 "parents": ", ".join(self._graph.parents(node_id)),

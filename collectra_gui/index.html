@@ -161,11 +161,8 @@
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>    
-    <link
-        rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/@annotorious/annotorious@latest/dist/annotorious.css">
-    <script
-        src="https://cdn.jsdelivr.net/npm/@annotorious/annotorious@latest/dist/annotorious.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@annotorious/annotorious@latest/dist/annotorious.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@annotorious/annotorious@latest/dist/annotorious.css">    
 </head>
 <body>
     <h1>Annotation Viewer</h1>
@@ -196,15 +193,13 @@
         </div>
     </div>
 
-    <script>
-
-        import { createImageAnnotator } from '@annotorious/annotorious';
-        import '@annotorious/annotorious/annotorious.css';
+    <script>                
 
         let apiReady = false;
         let gridApi = null;
         let selectedYamlPath = '';
         let selectedImageFile = null;
+        let anno = null;
 
         const updateCellValue = async (params) => {
             const nodeId = params.data.displaySourceId;
@@ -214,8 +209,7 @@
                 if (!result.success) {
                     console.error('Failed to update node data:', result.error);
                 }
-                display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");
-                console.log(display_data);
+                display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");                
                 gridApi.setGridOption('rowData', display_data);
             } catch (e) {
                 console.error('Error updating node data:', e);
@@ -313,7 +307,17 @@
                 const result = await window.pywebview.api.get_image_base64(imagePath);
                 if (result.success) {
                     const container = document.getElementById('imageContainer');
-                    container.innerHTML = `<img src="${result.data}" alt="Loaded image">`;
+                    container.innerHTML = `<img id="uploadedImage" src="${result.data}" alt="Loaded image">`;
+                    anno = Annotorious.createImageAnnotator('uploadedImage');
+                    anno.on('clickAnnotation', (annotation, originalEvent) => {
+                        console.log('Annotation clicked: ' + annotation.id);
+                    });
+                    anno.setStyle({
+                        fill: '#FFEA2E',
+                        fillOpacity: 0.1,
+                        stroke: '#FFEA2E',
+                        strokeOpacity: 1
+                    });
                 } else {
                     console.error('Failed to load image:', result.error);
                     clearImage();
@@ -322,34 +326,69 @@
                 console.error('Error loading image:', e);
                 clearImage();
             }
-        }
-
-        function displayImage(file) {
-            const container = document.getElementById('imageContainer');
-            const reader = new FileReader();
-
-            reader.onload = function(e) {
-                container.innerHTML = `<img src="${e.target.result}" alt="Uploaded image">`;
-            };
-
-            reader.onerror = function() {
-                container.innerHTML = '<div class="image-placeholder">Error loading image</div>';
-            };
-
-            reader.readAsDataURL(file);
-        }
+        }        
 
         function clearImage() {
             const container = document.getElementById('imageContainer');
             container.innerHTML = '<div class="image-placeholder">No image loaded. Select a folder containing an image file.</div>';
         }
 
+        function calculateGeometryFromCropRegion(cropRegion) {
+            if (!cropRegion) return null;
+            const image_div = document.querySelector("#uploadedImage");
+            console.log(image_div);
+            const imgWidth = image_div.naturalWidth;
+            const imgHeight = image_div.naturalHeight;                   
+            let x = (cropRegion["x_center"] - cropRegion["width_relative"]/2)*imgWidth;
+            let y = (cropRegion["y_center"] - cropRegion["height_relative"]/2)*imgHeight;
+            let width = cropRegion["width_relative"]*imgWidth;
+            let height = cropRegion["height_relative"]*imgHeight;                     
+            return {x, y, width, height};
+        }
+
+        function createAnnotation(geometry, data) {
+            let annotation = {
+                id: data.id,
+                target:{
+                    selector:{
+                        type: 'RECTANGLE',
+                        geometry: {
+                            bounds: {
+                                minX: geometry.x,
+                                minY: geometry.y,
+                                maxX: geometry.x + geometry.width,
+                                maxY: geometry.y + geometry.height
+                            },
+                            x: geometry.x,
+                            y: geometry.y,
+                            w: geometry.width,
+                            h: geometry.height
+                        }
+                    }
+                },
+                bodies:[
+                    data
+                ]                
+            };            
+            return annotation;
+        }
+
         async function loadGridData() {
             try {
                 const result = await window.pywebview.api.get_all_nodes_for_grid();
                 if (result.success) {
-                    display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");
-                    gridApi.setGridOption('rowData', display_data);
+                    display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");                    
+                    gridApi.setGridOption('rowData', display_data);                                        
+                    anno.clearAnnotations();                                                
+                    display_data.forEach(row => {                        
+                        const geometry = calculateGeometryFromCropRegion(row.crop_region);
+                        if (!geometry) {
+                            console.log('No geometry for:', row.id);
+                            return;
+                        }                        
+                        console.log('Adding annotation for:', row.id);        
+                        anno.addAnnotation(createAnnotation(geometry, row));
+                    });
                 } else {
                     console.error('Failed to load grid data:', result.error);
                 }
