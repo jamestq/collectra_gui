@@ -10,8 +10,9 @@ Tests cover:
 
 import base64
 import os
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from collectra_gui.api import Api, get_resource_path
 

@@ -8,6 +8,7 @@ Tests cover:
 """
 
 import pytest
+
 from collectra_gui.lineage_display import (
     AnnotationGraph,
     compute_display_value,
@@ -228,7 +229,9 @@ class TestAnnotationGraphSetters:
             sample_graph.set_data("nonexistent", "value")
 
     def test_set_data_raises_for_missing_data_field(self, empty_graph):
-        empty_graph.add_node("label", "node_no_data", {"type": "t", "id": "node_no_data"})
+        empty_graph.add_node(
+            "label", "node_no_data", {"type": "t", "id": "node_no_data"}
+        )
         with pytest.raises(ValueError, match="no data field"):
             empty_graph.set_data("node_no_data", "value")
 

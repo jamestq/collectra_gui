@@ -10,15 +10,17 @@ JavaScript usage:
     const nodes = await pywebview.api.get_all_nodes()
 """
 
-import webview
-import webview.menu as menu
-import typer
-import yaml
 import base64
 import os
 from pathlib import Path
-from collectra_gui.lineage_display import AnnotationGraph, compute_display_value
+
+import typer
+import webview
+import webview.menu as menu
+import yaml
 from rich import print
+
+from collectra_gui.lineage_display import AnnotationGraph, compute_display_value
 
 app = typer.Typer()
 

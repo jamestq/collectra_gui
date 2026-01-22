@@ -11,8 +11,9 @@ for ImageCrop annotations based on the rules:
 """
 
 from dataclasses import dataclass, field
-from rich import print
+
 import yaml
+from rich import print
 
 
 def normalize_parents(parents: str | list[str] | None) -> list[str]:

@@ -3,6 +3,7 @@ Shared pytest fixtures for collectra_gui tests.
 """
 
 import pytest
+
 from collectra_gui.lineage_display import AnnotationGraph
 
 
