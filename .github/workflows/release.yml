@@ -53,13 +53,36 @@ jobs:
             libgirepository1.0-dev \
             gir1.2-webkit2-4.1
 
-      - name: Install Python dependencies
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Python dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          pip install pythonnet --prefer-binary
+          poetry install --with dev
+        shell: pwsh
+
+      - name: Install Python dependencies (Unix)
+        if: runner.os != 'Windows'
         run: |
           python -m pip install --upgrade pip
           pip install poetry
           poetry install --with dev
 
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          poetry run pyinstaller collectra_gui.spec --clean
+        shell: pwsh
+
+      - name: Build with PyInstaller (Unix)
+        if: runner.os != 'Windows'
         run: |
           poetry run pyinstaller collectra_gui.spec --clean
 
