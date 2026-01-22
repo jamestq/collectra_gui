@@ -362,7 +362,6 @@ vite.config.ts.timestamp-*
 # AI tool files
 .github/agents/
 .claude
-hooks
 
 # Pyenv
 .python-version

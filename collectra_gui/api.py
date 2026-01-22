@@ -506,7 +506,7 @@ class Api:
             "descendants": descendants
         }
 
-def get_resource_path(relative_path: str) -> Path:
+def get_resource_path(relative_path: str) -> str:
     """Get the path to a bundled resource, works for dev and PyInstaller."""
     import sys
     if getattr(sys, 'frozen', False):
@@ -515,7 +515,7 @@ def get_resource_path(relative_path: str) -> Path:
     else:
         # Running in development
         base_path = Path(__file__).parent
-    return base_path / relative_path
+    return str(base_path / relative_path)
 
 
 @app.command()
@@ -543,13 +543,6 @@ def start(
 
     webview.start(func=on_started, debug=debug)
     return window
-
-@app.command()
-def placeholder():
-    """
-    Placeholder command to allow script execution.
-    """
-    pass
 
 if __name__ == "__main__":
     app()
