@@ -506,20 +506,30 @@ class Api:
             "descendants": descendants
         }
 
+def get_resource_path(relative_path: str) -> Path:
+    """Get the path to a bundled resource, works for dev and PyInstaller."""
+    import sys
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller bundle
+        base_path = Path(sys._MEIPASS)
+    else:
+        # Running in development
+        base_path = Path(__file__).parent
+    return base_path / relative_path
+
+
 @app.command()
 def start(
-    html_path = Path.cwd() / "collectra_gui/index.html",
-    debug: bool = True
+    debug: bool = False
 ):
     """
     Create and start the pywebview window with the API.
 
     Args:
-        html_path: Path to the HTML file to load
         debug: Enable developer tools
     """
     api = Api()
-    print(html_path)
+    html_path = get_resource_path("index.html")
     window = webview.create_window(
         title="Annotation Display",
         url=html_path,

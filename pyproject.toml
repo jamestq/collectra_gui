@@ -21,3 +21,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 collectra_gui = "collectra_gui.api:app"
+
+[tool.poetry.group.dev.dependencies]
+pyinstaller = "^6.0"
