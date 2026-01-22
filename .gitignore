@@ -358,3 +358,11 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# AI tool files
+.github/agents
+.claude
+hooks
+
+# Pyenv
+.python-version
