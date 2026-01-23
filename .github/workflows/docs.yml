@@ -82,7 +82,7 @@ jobs:
           filename: coverage-badge.json
           label: coverage
           message:  ${{ env.COVERAGE }} 
-          varColorRange: ${{ env.COVERAGE }}
+          valColorRange: ${{ env.COVERAGE }}
           maxColorRange: 100
-          minColoRange: 0
+          minColorRange: 0
 
