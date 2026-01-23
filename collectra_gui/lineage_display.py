@@ -1,6 +1,4 @@
 """
-Demonstrates annotation display logic from overview_architecture.md.
-
 Parses YAML structure, builds lineage relationships, and computes display values
 for ImageCrop annotations based on the rules:
 
