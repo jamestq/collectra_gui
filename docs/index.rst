@@ -4,7 +4,7 @@ Collectra GUI
 .. image:: https://img.shields.io/badge/python-3.12+-blue.svg
    :alt: Python Version
 
-.. image:: https://img.shields.io/endpoint?url=https://gist.github.com/jamestq/3d9df571edfc07dcd67e9fa6cdac19a7/raw/coverage-badge.json
+.. image:: https://img.shields.io/gist/coverage/3d9df571edfc07dcd67e9fa6cdac19a7
    :target: https://jamestq.github.io/collectra_gui/coverage/
    :alt: Coverage Status
 
