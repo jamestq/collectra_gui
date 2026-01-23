@@ -1,5 +1,7 @@
 # Collectra GUI
 
+[Test Coverage](https://img.shields.io/endpoint?url=https://gist.github.com/jamestq/3d9df571edfc07dcd67e9fa6cdac19a7/raw/coverage-badge.json)
+
 A desktop application for viewing and editing annotation data with an interactive visual interface.
 
 ## Installation
