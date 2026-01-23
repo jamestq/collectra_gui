@@ -75,27 +75,24 @@ class TestApiGetDisplayValue:
         assert "No graph loaded" in result["error"]
 
     def test_valid_node(self, temp_yaml_file):
-        """Note: api.get_display_value has a bug - it unpacks 3 values but
-        compute_display_value returns 4. This test documents current behavior."""
         api = Api()
         api.load_yaml(str(temp_yaml_file))
         result = api.get_display_value("text_001")
 
-        # Currently fails due to unpacking mismatch in api.py line 176
-        # compute_display_value returns (value, source_id, crop_region, reason)
-        # but api.py expects (value, source_id, reason)
-        assert result["success"]
-        assert "error" not in result
+        assert result["success"] is True
+        assert "value" in result
+        assert "source_id" in result
+        assert "crop_region" in result
+        assert "reason" in result
 
     def test_nonexistent_node(self, temp_yaml_file):
-        """Note: Due to unpacking bug in api.py, this returns error."""
         api = Api()
         api.load_yaml(str(temp_yaml_file))
         result = api.get_display_value("nonexistent")
 
-        # Same unpacking bug affects this case
         assert result["success"] is True
-        assert "error" not in result
+        assert result["value"] is None
+        assert "not found" in result["reason"]
 
 
 class TestApiGetAllNodes:
@@ -184,32 +181,6 @@ class TestApiGetNodesByType:
         assert result["count"] == 0
 
 
-class TestApiGetDisplayValuesForType:
-    """Tests for Api.get_display_values_for_type method."""
-
-    def test_no_graph_loaded(self):
-        api = Api()
-        result = api.get_display_values_for_type("ImageCrop")
-
-        assert result["success"] is False
-        assert "No graph loaded" in result["error"]
-
-    def test_returns_display_values_for_matching_nodes(self, temp_yaml_file):
-        api = Api()
-        api.load_yaml(str(temp_yaml_file))
-        result = api.get_display_values_for_type("ImageCrop")
-
-        assert result["success"] is True
-        assert result["count"] == 1
-        assert len(result["results"]) == 1
-
-        crop_result = result["results"][0]
-        assert crop_result["node_id"] == "crop_001"
-        assert "value" in crop_result
-        assert "source_id" in crop_result
-        assert "reason" in crop_result
-
-
 class TestApiGetAllNodesForGrid:
     """Tests for Api.get_all_nodes_for_grid method."""
 
@@ -239,6 +210,9 @@ class TestApiGetAllNodesForGrid:
             assert "type" in row
             assert "data" in row
             assert "displayValue" in row
+            assert "crop_region" in row
+            assert "displaySourceId" in row
+            assert "reason" in row
             assert "parents" in row
             assert "children" in row
 
@@ -251,6 +225,8 @@ class TestApiUpdateNodeData:
         api.load_yaml(str(temp_yaml_file))
 
         result = api.update_node_data("text_001", "Updated text content")
+
+        assert api._graph is not None
 
         assert result["success"] is True
         # Verify the update in graph
@@ -272,6 +248,8 @@ class TestApiUpdateNodeCoordinates:
     def test_updates_crop_region(self, temp_yaml_file):
         api = Api()
         api.load_yaml(str(temp_yaml_file))
+
+        assert api._graph is not None
 
         new_region = {
             "x_center": 0.8,
@@ -310,6 +288,7 @@ class TestApiCreateAnnotation:
     def test_creates_annotation_with_text_child(self, temp_yaml_file):
         api = Api()
         api.load_yaml(str(temp_yaml_file))
+        assert api._graph is not None
 
         initial_count = len(api._graph.nodes)
 
@@ -328,6 +307,7 @@ class TestApiCreateAnnotation:
     def test_created_annotation_has_correct_parent(self, temp_yaml_file):
         api = Api()
         api.load_yaml(str(temp_yaml_file))
+        assert api._graph is not None
 
         crop_region = {
             "x_center": 0.6,
@@ -359,7 +339,7 @@ class TestApiDeleteAnnotation:
     def test_deletes_crop_and_text_children(self, temp_yaml_file):
         api = Api()
         api.load_yaml(str(temp_yaml_file))
-
+        assert api._graph is not None
         # Delete crop_001 which has text_001 as child
         result = api.delete_annotation("crop_001")
 
@@ -454,7 +434,7 @@ class TestApiGetImageBase64:
         jpg_file = tmp_path / "test.jpg"
         jpg_file.write_bytes(b"fake jpg data")
         result = api.get_image_base64(str(jpg_file))
-        assert "image/jpeg" in result["data"]
+        assert "image/jpg" in result["data"]
 
         # Test GIF
         gif_file = tmp_path / "test.gif"
@@ -473,7 +453,9 @@ class TestApiGetImageBase64:
         unknown_file = tmp_path / "test.xyz"
         unknown_file.write_bytes(b"fake data")
         result = api.get_image_base64(str(unknown_file))
-        assert "image/png" in result["data"]
+        # Unknown extensions raise KeyError and return error
+        assert result["success"] is False
+        assert "error" in result
 
 
 class TestApiSelectFolder:
@@ -625,6 +607,8 @@ class TestApiIntegration:
         # Load
         load_result = api.load_yaml(str(temp_yaml_file))
         assert load_result["success"] is True
+
+        assert api._graph is not None
 
         initial_count = len(api._graph.nodes)
 

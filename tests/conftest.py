@@ -4,7 +4,7 @@ Shared pytest fixtures for collectra_gui tests.
 
 import pytest
 
-from collectra_gui.lineage_display import AnnotationGraph
+from collectra_gui.lineage_display import CollectraGraph
 
 
 @pytest.fixture
@@ -108,19 +108,19 @@ def complex_yaml_data():
 @pytest.fixture
 def sample_graph(sample_yaml_data):
     """Pre-built AnnotationGraph from sample_yaml_data."""
-    return AnnotationGraph.from_yaml_data(sample_yaml_data)
+    return CollectraGraph.from_yaml_data(sample_yaml_data)
 
 
 @pytest.fixture
 def complex_graph(complex_yaml_data):
     """Pre-built AnnotationGraph from complex_yaml_data."""
-    return AnnotationGraph.from_yaml_data(complex_yaml_data)
+    return CollectraGraph.from_yaml_data(complex_yaml_data)
 
 
 @pytest.fixture
 def empty_graph():
     """Empty AnnotationGraph."""
-    return AnnotationGraph()
+    return CollectraGraph()
 
 
 @pytest.fixture
