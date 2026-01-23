@@ -78,9 +78,11 @@ jobs:
         uses: schneegans/dynamic-badges-action@v1.7.0
         with:
           auth:  ${{ secrets.GIST_SECRET }} 
-          gistID: f1d9191993105301fd6f813fe1e659f6
+          gistID: 3d9df571edfc07dcd67e9fa6cdac19a7
           filename: coverage-badge.json
           label: coverage
           message:  ${{ env.COVERAGE }} 
-          color: green
+          varColorRange: ${{ env.COVERAGE }}
+          maxColorRange: 100
+          minColoRange: 0
 
