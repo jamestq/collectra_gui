@@ -357,59 +357,6 @@ class TestApiDeleteAnnotation:
         assert "error" in result
 
 
-class TestApiGetLineage:
-    """Tests for Api.get_lineage method."""
-
-    def test_no_graph_loaded(self):
-        api = Api()
-        result = api.get_lineage("any_node")
-
-        assert result["success"] is False
-        assert "No graph loaded" in result["error"]
-
-    def test_nonexistent_node(self, temp_yaml_file):
-        api = Api()
-        api.load_yaml(str(temp_yaml_file))
-        result = api.get_lineage("nonexistent")
-
-        assert result["success"] is False
-        assert "not found" in result["error"]
-
-    def test_returns_ancestors_and_descendants(self, temp_yaml_file):
-        api = Api()
-        api.load_yaml(str(temp_yaml_file))
-        result = api.get_lineage("crop_001")
-
-        assert result["success"] is True
-        assert result["node_id"] == "crop_001"
-        assert "ancestors" in result
-        assert "descendants" in result
-
-        # crop_001 has img_001 as ancestor
-        ancestor_ids = [a["id"] for a in result["ancestors"]]
-        assert "img_001" in ancestor_ids
-
-        # crop_001 has text_001 as descendant
-        descendant_ids = [d["id"] for d in result["descendants"]]
-        assert "text_001" in descendant_ids
-
-    def test_root_node_has_no_ancestors(self, temp_yaml_file):
-        api = Api()
-        api.load_yaml(str(temp_yaml_file))
-        result = api.get_lineage("img_001")
-
-        assert result["success"] is True
-        assert result["ancestors"] == []
-
-    def test_leaf_node_has_no_descendants(self, temp_yaml_file):
-        api = Api()
-        api.load_yaml(str(temp_yaml_file))
-        result = api.get_lineage("text_001")
-
-        assert result["success"] is True
-        assert result["descendants"] == []
-
-
 class TestApiGetImageBase64:
     """Tests for Api.get_image_base64 method."""
 
@@ -641,29 +588,3 @@ class TestApiIntegration:
         assert delete_result["success"] is True
         assert new_crop_id not in api._graph.nodes
         assert new_text_id not in api._graph.nodes
-
-    def test_lineage_traversal_with_complex_graph(self, tmp_path, complex_yaml_data):
-        """Test lineage traversal with complex nested structure."""
-        import yaml
-
-        yaml_file = tmp_path / "complex.yaml"
-        with open(yaml_file, "w") as f:
-            yaml.dump(complex_yaml_data, f)
-
-        api = Api()
-        api.load_yaml(str(yaml_file))
-
-        # Test lineage from middle node
-        result = api.get_lineage("leaf_crop_001")
-        assert result["success"] is True
-
-        ancestor_ids = {a["id"] for a in result["ancestors"]}
-        descendant_ids = {d["id"] for d in result["descendants"]}
-
-        # Should have container_crop and img as ancestors
-        assert "container_crop_001" in ancestor_ids
-        assert "img_001" in ancestor_ids
-
-        # Should have text nodes as descendants
-        assert "text_001" in descendant_ids
-        assert "text_002" in descendant_ids

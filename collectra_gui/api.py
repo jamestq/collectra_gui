@@ -418,53 +418,6 @@ class Api:
                 )
                 f.write("\n")
 
-    def get_lineage(self, node_id: str) -> dict:
-        """
-        Get the full lineage (ancestors and descendants) of a node.
-
-        Args:
-            node_id: The annotation ID
-
-        Returns:
-            dict with 'ancestors' and 'descendants' lists
-        """
-        if self._graph is None:
-            return {"success": False, "error": "No graph loaded. Call load_yaml first."}
-
-        if node_id not in self._graph.nodes:
-            return {"success": False, "error": f"Node '{node_id}' not found"}
-
-        # Get ancestors (traverse up)
-        ancestors = []
-        visited = set()
-        stack = list(self._graph.parents(node_id))
-        while stack:
-            current = stack.pop()
-            if current in visited or current not in self._graph.nodes:
-                continue
-            visited.add(current)
-            ancestors.append({"id": current, "type": self._graph.get_type(current)})
-            stack.extend(self._graph.parents(current))
-
-        # Get descendants (traverse down)
-        descendants = []
-        visited = set()
-        stack = list(self._graph.children(node_id))
-        while stack:
-            current = stack.pop()
-            if current in visited:
-                continue
-            visited.add(current)
-            descendants.append({"id": current, "type": self._graph.get_type(current)})
-            stack.extend(self._graph.children(current))
-
-        return {
-            "success": True,
-            "node_id": node_id,
-            "ancestors": ancestors,
-            "descendants": descendants,
-        }
-
 
 def get_resource_path(relative_path: str) -> str:
     """Get the path to a bundled resource, works for dev and PyInstaller."""
