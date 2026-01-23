@@ -1,7 +1,7 @@
 # Collectra GUI
 
 [![Test Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/jamestq/3d9df571edfc07dcd67e9fa6cdac19a7/raw)](https://jamestq.github.io/collectra_gui/coverage/)
-[![Docs](https://gist.github.com/jamestq/79685f93282a98e1d62994bb45bf4128/raw)](https://jamestq.github.io/collectra_gui/coverage/)
+[![Docs](https://img.shields.io/endpoint?url=https://gist.github.com/jamestq/79685f93282a98e1d62994bb45bf4128/raw)](https://jamestq.github.io/collectra_gui/)
 
 A desktop application for viewing and editing annotation data with an interactive visual interface.
 
