@@ -53,10 +53,44 @@ class Api:
         self._graph: CollectraGraph | None = None
         self._yaml_path: str | None = None
         self._window = None
+        self._grapto_folders: list[dict] = []
+        self._parent_folder: str | None = None
 
     def set_window(self, window):
         """Store the window reference for use in dialogs."""
         self._window = window
+
+    def _scan_grapto_folder(self, folder_path: Path) -> dict | None:
+        """
+        Scan a folder for YAML and image files.
+
+        Args:
+            folder_path: Path to the folder to scan
+
+        Returns:
+            dict with yaml_path and image_path if both found, None otherwise
+        """
+        yaml_path = None
+        image_path = None
+        image_extensions = [f".{ext.lower()}" for ext in ImageFormat.__members__.keys()]
+
+        for filename in folder_path.iterdir():
+            if not filename.is_file():
+                continue
+
+            if filename.suffix in [".yaml", ".yml"] and yaml_path is None:
+                yaml_path = filename
+
+            if filename.suffix.lower() in image_extensions and image_path is None:
+                image_path = filename
+
+            if yaml_path and image_path:
+                break
+
+        if yaml_path is None or image_path is None:
+            return None
+
+        return {"yaml_path": str(yaml_path), "image_path": str(image_path)}
 
     def select_folder(self) -> dict:
         """
@@ -111,6 +145,85 @@ class Api:
 
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    def select_parent_folder(self) -> dict:
+        """
+        Open native folder dialog and scan for .grapto subdirectories.
+
+        Returns:
+            dict with parent_path and list of folder names/indices
+        """
+        if self._window is None:
+            return {"success": False, "error": "Window not initialized"}
+
+        try:
+            result = self._window.create_file_dialog(dialog_type=webview.FOLDER_DIALOG)
+
+            if not result or len(result) == 0:
+                return {"success": False, "error": "No folder selected"}
+
+            parent_path = Path(result[0])
+            self._parent_folder = str(parent_path)
+            self._grapto_folders = []
+
+            for entry in sorted(parent_path.iterdir()):
+                if not entry.is_dir():
+                    continue
+                if not entry.suffix == ".grapto":
+                    continue
+
+                scan_result = self._scan_grapto_folder(entry)
+                if scan_result is not None:
+                    self._grapto_folders.append(
+                        {
+                            "name": entry.name,
+                            "path": str(entry),
+                            "yaml_path": scan_result["yaml_path"],
+                            "image_path": scan_result["image_path"],
+                        }
+                    )
+
+            folders = [
+                {"name": f["name"], "index": i}
+                for i, f in enumerate(self._grapto_folders)
+            ]
+
+            return {
+                "success": True,
+                "parent_path": str(parent_path),
+                "folders": folders,
+            }
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def load_grapto_folder(self, index: int) -> dict:
+        """
+        Load a .grapto folder by its index from the previously scanned parent folder.
+
+        Args:
+            index: Index of the folder in the _grapto_folders list
+
+        Returns:
+            dict with folder_name, yaml_path, image_path
+        """
+        if not self._grapto_folders:
+            return {
+                "success": False,
+                "error": "No folders loaded. Call select_parent_folder first.",
+            }
+
+        if index < 0 or index >= len(self._grapto_folders):
+            return {"success": False, "error": f"Invalid folder index: {index}"}
+
+        folder = self._grapto_folders[index]
+        return {
+            "success": True,
+            "folder_name": folder["name"],
+            "folder_path": folder["path"],
+            "yaml_path": folder["yaml_path"],
+            "image_path": folder["image_path"],
+        }
 
     def get_image_base64(self, image_path: str) -> dict:
         """
@@ -266,12 +379,15 @@ class Api:
                     "reason": node_display_value.reason,
                     "parents": ", ".join(self._graph.parents(node_id)),
                     "children": ", ".join(self._graph.children(node_id)),
+                    "locked": node_display_value.locked,
                 }
             )
 
         return {"success": True, "rows": rows}
 
-    def update_node_data(self, node_id: str, new_data: str) -> dict:
+    def update_node_data(
+        self, node_id: str, new_data: str, crop_id: str | None = None
+    ) -> dict:
         """
         Update the data of a specific node.
 
@@ -285,7 +401,7 @@ class Api:
         try:
             if self._graph is None:
                 raise ValueError("No graph loaded. Call load_yaml first.")
-            self._graph.set_data(node_id, new_data)
+            self._graph.set_data(node_id, new_data, crop_id)
             self._save_to_yaml()
             return self.get_all_nodes_for_grid()
         except Exception as e:
@@ -355,17 +471,6 @@ class Api:
                 **crop_region,
             }
             self._graph.add_node(crop_data)
-
-            # Create Text child node
-            text_data = {
-                "label": "user_annotation_text",
-                "type": "collectra.Text",
-                "id": text_id,
-                "parents": crop_id,
-                "data": "",
-            }
-            self._graph.add_node(text_data)
-
             # Save and return updated grid
             self._save_to_yaml()
             return self.get_all_nodes_for_grid()
@@ -412,7 +517,7 @@ class Api:
         with open(self._yaml_path, "w") as f:
             for key, value in yaml_data.items():
                 yaml.dump(
-                    {key: [value] if not isinstance(value, list) else value},
+                    {key: value if not isinstance(value, list) else value},
                     f,
                     sort_keys=False,
                 )

@@ -11,7 +11,7 @@ from collectra_gui.lineage_display import CollectraGraph
 def sample_yaml_data():
     """Minimal valid YAML structure for testing."""
     return {
-        "collectra_results_metadata": {"version": "1.0"},
+        "collectra_results_metadata": {"version": "1.0.0"},
         "image_label": [
             {
                 "type": "collectra.Image",
@@ -46,7 +46,7 @@ def sample_yaml_data():
 def complex_yaml_data():
     """Complex YAML with nested crops, containers, and multiple text children."""
     return {
-        "collectra_results_metadata": {"version": "1.0"},
+        "collectra_results_metadata": {"version": "1.0.0"},
         "image_label": [
             {
                 "type": "collectra.Image",

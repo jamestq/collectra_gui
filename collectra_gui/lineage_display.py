@@ -8,6 +8,7 @@ for ImageCrop annotations based on the rules:
 
 """
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
@@ -24,8 +25,8 @@ class Metadata(BaseModel):
 
     key: str = "collectra_results_metadata"
     version: str = "1.0.0"
-    generated_by: str = "collectra_gui"
-    description: str = "Collectra results metadata"
+    workflow: str = "collectra_gui"
+    timestamp: str = ""
 
     def model_dump(self, *args, **kwargs) -> dict:
         data = super().model_dump(*args, **kwargs)
@@ -64,6 +65,10 @@ class CollectraNode(BaseModel):
     def model_dump(self, *args, **kwargs) -> dict[str, str | float]:
         data = super().model_dump(*args, **kwargs)
         label = data.pop("label", None)  # Exclude label from dump
+        if "parents" in data:
+            data["parents"] = (
+                data["parents"][0] if len(data["parents"]) == 1 else data["parents"]
+            )
         if label is None:
             raise ValueError("Label is missing from node data.")
         return data
@@ -103,6 +108,7 @@ class NodeDisplayValue(BaseModel):
     value: str | None = None
     source_id: str | None = None
     crop_region: dict[str, float] | None = None
+    locked: bool = False
 
 
 @dataclass
@@ -151,7 +157,6 @@ class CollectraGraph:
         """Add a node and its parent edges."""
         data["parents"] = normalise_items(data.get("parents", []))
         node = CollectraNodeFactory.create_node(data)
-
         self._graph.add_node(
             node.id,
             node=node,
@@ -202,12 +207,24 @@ class CollectraGraph:
 
         return node.crop
 
-    def set_data(self, node_id: str, data: str) -> None:
+    def set_data(self, node_id: str, data: str, crop_id: str | None = None) -> None:
         """Set data field of a node."""
-        node = self._get_node(node_id)
-        if node is None:
-            raise ValueError(f"Node {node_id} not found.")
-        node.data = data
+        if node_id:
+            node = self._get_node(node_id)
+            if node is None:
+                raise ValueError(f"Node {node_id} not found in graph.")
+            node.data = data
+            return
+        if not crop_id:
+            raise ValueError(f"Node {node_id} not found and crop_id not provided.")
+        text_data = {
+            "label": "user_annotation_text",
+            "type": "collectra.Text",
+            "id": f"user_text_{uuid.uuid4().hex[:8]}",
+            "parents": crop_id,
+            "data": data,
+        }
+        self.add_node(text_data)
 
     def set_crop_region(self, node_id: str, crop_region: dict[str, float]) -> None:
         """Set crop region fields of a node (x_center, y_center, width_relative, height_relative)."""
@@ -278,9 +295,13 @@ class CollectraGraph:
 
         if self.metadata:
             metadata = self.metadata.model_dump()
-            final_data.update({self.metadata.key: metadata})
+            final_data[self.metadata.key] = metadata
 
-        final_data.update(yaml_data)
+        for key, value in yaml_data.items():
+            if isinstance(value, list) and len(value) == 1:
+                final_data[key] = value[0]
+            else:
+                final_data[key] = value
 
         return final_data
 
@@ -303,16 +324,19 @@ class CollectraGraph:
         if "Image" in node_type and "ImageCrop" not in node_type:
             return NodeDisplayValue(
                 reason=f"{node_id} is of collectra.Image type: display blank",
+                locked=True,
             )
 
         # Rules for ImageCrop
         if "ImageCrop" in node_type:
             crop_data = self.get_crop_region(node_id)
+
             # Rule 1: Container crop (has ImageCrop children)
             if self.children_of_type(node_id, "ImageCrop"):
                 return NodeDisplayValue(
                     crop_region=crop_data,
                     reason=f"{node_id} is a container crop: display blank",
+                    locked=True,
                 )
 
             # Rule 2: Leaf crop with Text child

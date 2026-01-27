@@ -215,6 +215,7 @@ class TestApiGetAllNodesForGrid:
             assert "reason" in row
             assert "parents" in row
             assert "children" in row
+            assert "locked" in row
 
 
 class TestApiUpdateNodeData:
@@ -285,7 +286,8 @@ class TestApiCreateAnnotation:
         assert result["success"] is False
         assert "No graph loaded" in result["error"]
 
-    def test_creates_annotation_with_text_child(self, temp_yaml_file):
+    def test_creates_annotation_imagecrop_only(self, temp_yaml_file):
+        """create_annotation() creates only ImageCrop, no Text child."""
         api = Api()
         api.load_yaml(str(temp_yaml_file))
         assert api._graph is not None
@@ -301,10 +303,11 @@ class TestApiCreateAnnotation:
         result = api.create_annotation(crop_region)
 
         assert result["success"] is True
-        # Should have added 2 nodes (ImageCrop + Text)
-        assert len(api._graph.nodes) == initial_count + 2
+        # Should have added 1 node (ImageCrop only, no Text child)
+        assert len(api._graph.nodes) == initial_count + 1
 
     def test_created_annotation_has_correct_parent(self, temp_yaml_file):
+        """Created ImageCrop has correct parent relationship."""
         api = Api()
         api.load_yaml(str(temp_yaml_file))
         assert api._graph is not None
@@ -324,6 +327,10 @@ class TestApiCreateAnnotation:
         new_crop = new_crops[0]
         parents = api._graph.parents(new_crop)
         assert "img_001" in parents
+
+        # Verify no text node was created
+        new_texts = [n for n in api._graph.nodes if n.startswith("user_text_")]
+        assert len(new_texts) == 0
 
 
 class TestApiDeleteAnnotation:
@@ -559,7 +566,7 @@ class TestApiIntegration:
 
         initial_count = len(api._graph.nodes)
 
-        # Create
+        # Create (now only creates ImageCrop, no Text child)
         crop_region = {
             "x_center": 0.5,
             "y_center": 0.5,
@@ -568,23 +575,145 @@ class TestApiIntegration:
         }
         create_result = api.create_annotation(crop_region)
         assert create_result["success"] is True
-        assert len(api._graph.nodes) == initial_count + 2
+        assert len(api._graph.nodes) == initial_count + 1
 
         # Find new crop id
         new_crop_id = [n for n in api._graph.nodes if n.startswith("user_crop_")][0]
+
+        # Create text node by calling update_node_data with empty node_id and crop_id
+        create_text_result = api.update_node_data(
+            "", "New annotation text", crop_id=new_crop_id
+        )
+        assert create_text_result["success"] is True
+        assert len(api._graph.nodes) == initial_count + 2
+
+        # Find new text id
         new_text_id = [n for n in api._graph.nodes if n.startswith("user_text_")][0]
 
         # Update text
-        update_result = api.update_node_data(new_text_id, "New annotation text")
+        update_result = api.update_node_data(new_text_id, "Updated annotation text")
         assert update_result["success"] is True
 
         # Read to verify
         node_info = api.get_node_info(new_text_id)
         assert node_info["success"] is True
-        assert api._graph.get_data(new_text_id) == "New annotation text"
+        assert api._graph.get_data(new_text_id) == "Updated annotation text"
 
         # Delete
         delete_result = api.delete_annotation(new_crop_id)
         assert delete_result["success"] is True
         assert new_crop_id not in api._graph.nodes
         assert new_text_id not in api._graph.nodes
+
+
+class TestApiCreateAnnotationBehavior:
+    """Tests for create_annotation new behavior (ImageCrop only)."""
+
+    def test_create_annotation_no_text_child_created(self, temp_yaml_file):
+        """create_annotation() creates only ImageCrop, no Text node."""
+        api = Api()
+        api.load_yaml(str(temp_yaml_file))
+        assert api._graph is not None
+        crop_region = {
+            "x_center": 0.5,
+            "y_center": 0.5,
+            "width_relative": 0.1,
+            "height_relative": 0.1,
+        }
+        api.create_annotation(crop_region)
+
+        # Should only find crop, not text
+        new_crops = [n for n in api._graph.nodes if n.startswith("user_crop_")]
+        new_texts = [n for n in api._graph.nodes if n.startswith("user_text_")]
+        assert len(new_crops) == 1
+        assert len(new_texts) == 0
+
+
+class TestApiGridLockedField:
+    """Tests for locked field in grid data."""
+
+    def test_get_all_nodes_for_grid_includes_locked_field(self, temp_yaml_file):
+        """Grid rows include 'locked' field from NodeDisplayValue."""
+        api = Api()
+        api.load_yaml(str(temp_yaml_file))
+        assert api._graph is not None
+        result = api.get_all_nodes_for_grid()
+
+        for row in result["rows"]:
+            assert "locked" in row
+            assert isinstance(row["locked"], bool)
+
+    def test_grid_locked_field_correct_for_node_types(self, temp_yaml_file):
+        """Image nodes are locked, others are not."""
+        api = Api()
+        api.load_yaml(str(temp_yaml_file))
+        assert api._graph is not None
+        result = api.get_all_nodes_for_grid()
+
+        for row in result["rows"]:
+            if "Image" in row["type"] and "ImageCrop" not in row["type"]:
+                assert row["locked"] is True
+            # Leaf crops and text can be edited
+
+
+class TestApiUpdateNodeDataWithCropId:
+    """Tests for update_node_data with crop_id parameter."""
+
+    def test_update_node_data_with_crop_id_creates_text(self, temp_yaml_file):
+        """update_node_data() with crop_id creates new Text node."""
+        api = Api()
+        api.load_yaml(str(temp_yaml_file))
+        assert api._graph is not None
+        initial_count = len(api._graph.nodes)
+
+        result = api.update_node_data("", "New text", crop_id="crop_001")
+
+        assert result["success"] is True
+        assert len(api._graph.nodes) == initial_count + 1
+        new_texts = [n for n in api._graph.nodes if n.startswith("user_text_")]
+        assert len(new_texts) == 1
+
+    def test_update_node_data_node_id_takes_precedence(self, temp_yaml_file):
+        """When both node_id and crop_id provided, updates existing node."""
+        api = Api()
+        api.load_yaml(str(temp_yaml_file))
+        assert api._graph is not None
+        initial_count = len(api._graph.nodes)
+
+        result = api.update_node_data("text_001", "Updated", crop_id="crop_001")
+
+        assert result["success"] is True
+        assert len(api._graph.nodes) == initial_count  # No new nodes
+        assert api._graph.get_data("text_001") == "Updated"
+
+
+class TestApiIntegrationCreateCropThenAddText:
+    """Integration test for creating crop then adding text."""
+
+    def test_integration_create_crop_then_add_text(self, temp_yaml_file):
+        """Workflow: create ImageCrop, then add Text via update_node_data."""
+        api = Api()
+        api.load_yaml(str(temp_yaml_file))
+        assert api._graph is not None
+
+        # Create crop
+        crop_region = {
+            "x_center": 0.5,
+            "y_center": 0.5,
+            "width_relative": 0.1,
+            "height_relative": 0.1,
+        }
+        create_result = api.create_annotation(crop_region)
+        assert create_result["success"] is True
+
+        # Get new crop ID
+        new_crop_id = [n for n in api._graph.nodes if n.startswith("user_crop_")][0]
+
+        # Add text to crop
+        update_result = api.update_node_data("", "Annotation text", crop_id=new_crop_id)
+        assert update_result["success"] is True
+
+        # Verify structure
+        new_text_id = [n for n in api._graph.nodes if n.startswith("user_text_")][0]
+        assert new_text_id in api._graph.children(new_crop_id)
+        assert api._graph.get_data(new_text_id) == "Annotation text"
