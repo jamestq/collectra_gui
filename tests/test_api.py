@@ -281,7 +281,7 @@ class TestApiCreateAnnotation:
 
     def test_no_graph_loaded(self):
         api = Api()
-        result = api.create_annotation({"x_center": 0.5}, "user_crop")
+        result = api.create_annotation({"x_center": 0.5}, "user_crop", "")
 
         assert result["success"] is False
         assert "No graph loaded" in result["error"]
@@ -300,7 +300,7 @@ class TestApiCreateAnnotation:
             "width_relative": 0.1,
             "height_relative": 0.05,
         }
-        result = api.create_annotation(crop_region, "user_crop")
+        result = api.create_annotation(crop_region, "user_crop", "")
 
         assert result["success"] is True
         # Should have added 1 node (ImageCrop only, no Text child)
@@ -318,7 +318,7 @@ class TestApiCreateAnnotation:
             "width_relative": 0.1,
             "height_relative": 0.05,
         }
-        api.create_annotation(crop_region, "user_crop")
+        api.create_annotation(crop_region, "user_crop", "")
 
         # Find the newly created crop (starts with user_crop-)
         new_crops = [n for n in api._graph.nodes if n.startswith("user_crop-")]
@@ -573,7 +573,7 @@ class TestApiIntegration:
             "width_relative": 0.1,
             "height_relative": 0.1,
         }
-        create_result = api.create_annotation(crop_region, "user_crop")
+        create_result = api.create_annotation(crop_region, "user_crop", "")
         assert create_result["success"] is True
         assert len(api._graph.nodes) == initial_count + 1
 
@@ -620,7 +620,7 @@ class TestApiCreateAnnotationBehavior:
             "width_relative": 0.1,
             "height_relative": 0.1,
         }
-        api.create_annotation(crop_region, "user_crop")
+        api.create_annotation(crop_region, "user_crop", "")
 
         # Should only find crop, not text
         new_crops = [n for n in api._graph.nodes if n.startswith("user_crop-")]
@@ -703,7 +703,7 @@ class TestApiIntegrationCreateCropThenAddText:
             "width_relative": 0.1,
             "height_relative": 0.1,
         }
-        create_result = api.create_annotation(crop_region, "user_crop")
+        create_result = api.create_annotation(crop_region, "user_crop", "")
         assert create_result["success"] is True
 
         # Get new crop ID

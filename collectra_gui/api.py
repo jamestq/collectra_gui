@@ -427,7 +427,7 @@ class Api:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def create_annotation(self, crop_region: dict, label: str) -> dict:
+    def create_annotation(self, crop_region: dict, label: str, parent_id: str) -> dict:
         """
         Create a new ImageCrop annotation with a Text child.
 
@@ -465,7 +465,7 @@ class Api:
                 "label": label,
                 "type": "collectra.ImageCrop",
                 "id": crop_id,
-                "parents": root_image_id,
+                "parents": parent_id if parent_id else root_image_id,
                 "data": Path(self._yaml_path).parent.name.replace(".yaml", ".jpg"),
                 **crop_region,
             }

@@ -399,13 +399,22 @@
             if (!pendingAnnotation) {
                 hideLabelPopup();
                 return;
-            }
-
-            const geometry = pendingAnnotation.target.selector.geometry;
-            const cropRegion = calculateCropRegionFromGeometry(geometry);
-
+            }            
             try {
-                const result = await window.pywebview.api.create_annotation(cropRegion, label);
+                const geometry = pendingAnnotation.target.selector.geometry;
+                const cropRegion = calculateCropRegionFromGeometry(geometry);
+                const allAnnotations = anno.getAnnotations();
+                // Get the parent annotation (an bigger rectangle that contains this one)
+                const parentAnnotations = allAnnotations.filter(ann => {
+                    if (ann.id === pendingAnnotation.id) return false;
+                    const parentGeom = ann.target.selector.geometry;
+                    return (geometry.x > parentGeom.x &&
+                            geometry.y > parentGeom.y &&
+                            (geometry.x + geometry.w) < (parentGeom.x + parentGeom.w) &&
+                            (geometry.y + geometry.h) < (parentGeom.y + parentGeom.h));
+                });                
+                const parentId = parentAnnotations.length > 0 ? parentAnnotations[parentAnnotations.length - 1].id : "";
+                const result = await window.pywebview.api.create_annotation(cropRegion, label, parentId);
                 if (result.success) {
                     // Update grid with new data
                     const display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");
@@ -746,6 +755,11 @@
                             tileSources: {
                                 type: 'image',
                                 url: result.data
+                            },   
+                            gestureSettingsMouse: {
+                                clickToZoom: false,
+                                dblClickToZoom: false,
+                                dblClickDragToZoom: false,
                             }
                         });
                         viewer.addHandler('open', function() {
@@ -754,7 +768,9 @@
                         });
                     });
 
-                    anno = AnnotoriousOSD.createOSDAnnotator(viewer);               
+                    anno = AnnotoriousOSD.createOSDAnnotator(viewer, {
+                        drawingEnabled: true,                          
+                    });               
                     anno.setStyle({
                         fill: '#FFEA2E',
                         fillOpacity: 0.1,
