@@ -211,6 +211,15 @@ class CollectraGraph:
 
         return node.crop
 
+    def get_unique_labels(self) -> list[str]:
+        """Get all unique labels from nodes in the graph."""
+        labels = set()
+        for node_id in self._graph.nodes:
+            node = self._get_node(node_id)
+            if node and node.label:
+                labels.add(node.label)
+        return sorted(labels)
+
     def set_data(self, node_id: str, data: str, crop_id: str | None = None) -> None:
         """Set data field of a node."""
         if node_id:

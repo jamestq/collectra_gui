@@ -55,6 +55,7 @@ class Api:
         self._window = None
         self._grapto_folders: list[dict] = []
         self._parent_folder: str | None = None
+        self._global_labels: set[str] = set()
 
     def set_window(self, window):
         """Store the window reference for use in dialogs."""
@@ -266,6 +267,9 @@ class Api:
             self._graph = CollectraGraph.from_yaml_data(yaml_data)
             self._yaml_path = path
 
+            # Accumulate labels from this graph
+            self._global_labels.update(self._graph.get_unique_labels())
+
             return {"success": True, "path": path}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -352,6 +356,19 @@ class Api:
         ]
 
         return {"success": True, "nodes": matching, "count": len(matching)}
+
+    def get_available_labels(self) -> dict:
+        """
+        Get all unique labels accumulated across all loaded files.
+
+        Returns:
+            dict with 'success' and 'labels' list (sorted)
+        """
+        try:
+            labels = sorted(self._global_labels)
+            return {"success": True, "labels": labels}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     def get_all_nodes_for_grid(self) -> dict:
         """
@@ -470,6 +487,7 @@ class Api:
                 **crop_region,
             }
             self._graph.add_node(crop_data)
+            self._global_labels.add(label)
             # Save and return updated grid
             self._save_to_yaml()
             return self.get_all_nodes_for_grid()

@@ -293,6 +293,61 @@
         .modal-buttons .btn-confirm:hover {
             background: #0056b3;
         }
+        /* Preset Labels Styles */
+        .preset-labels {
+            margin-bottom: 12px;
+        }
+        .preset-labels-title {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .preset-labels-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        .preset-label-btn {
+            padding: 6px 12px;
+            background: #e9ecef;
+            border: 1px solid #ddd;
+            color: #007bff;
+            border-radius: 16px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .preset-label-btn:hover {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .preset-labels-empty {
+            color: #999;
+            font-style: italic;
+            font-size: 12px;
+        }
+        .custom-label-divider {
+            display: flex;
+            align-items: center;
+            margin: 12px 0;
+            font-size: 12px;
+            color: #999;
+        }
+        .custom-label-divider::before,
+        .custom-label-divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #ddd;
+        }
+        .custom-label-divider::before {
+            margin-right: 10px;
+        }
+        .custom-label-divider::after {
+            margin-left: 10px;
+        }
     </style>
     <link rel="stylesheet" 
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
@@ -355,7 +410,15 @@
     <div id="labelModal" class="modal-overlay">
         <div class="modal-popup">
             <h3>Enter Label Name</h3>
-            <input type="text" id="labelInput" placeholder="Enter label name..." autofocus>
+            <!-- Preset Labels Section -->
+            <div class="preset-labels">
+                <div class="preset-labels-title">Select from existing labels:</div>
+                <div id="presetLabelsContainer" class="preset-labels-container">
+                    <!-- Preset buttons will be populated here -->
+                </div>
+            </div>
+            <div class="custom-label-divider">or enter custom</div>
+            <input type="text" id="labelInput" placeholder="Enter custom label name..." autofocus>
             <div class="modal-buttons">
                 <button class="btn-cancel" onclick="cancelLabel()">Cancel</button>
                 <button class="btn-confirm" onclick="confirmLabel()">Confirm</button>
@@ -376,11 +439,16 @@
         let currentFolderIndex = -1;
         let sidebarVisible = false;
         let pendingAnnotation = null;
+        let availableLabels = [];
 
         function showLabelPopup(annotation) {
             pendingAnnotation = annotation;
             const modal = document.getElementById('labelModal');
             const input = document.getElementById('labelInput');
+
+            // Populate preset labels before showing
+            populatePresetLabels();
+
             modal.classList.add('visible');
             input.value = '';
             input.focus();
@@ -390,6 +458,49 @@
             const modal = document.getElementById('labelModal');
             modal.classList.remove('visible');
             pendingAnnotation = null;
+        }
+
+        async function fetchAvailableLabels() {
+            if (!apiReady) return;
+            try {
+                const result = await window.pywebview.api.get_available_labels();
+                console.log('fetchAvailableLabels result:', result);
+                if (result.success) {
+                    availableLabels = result.labels;
+                    console.log('availableLabels updated:', availableLabels);
+                } else {
+                    availableLabels = [];
+                    console.warn('get_available_labels failed:', result.error);
+                }
+            } catch (e) {
+                console.error('Error fetching labels:', e);
+                availableLabels = [];
+            }
+        }
+
+        function populatePresetLabels() {
+            console.log('populatePresetLabels called, availableLabels:', availableLabels);
+            const container = document.getElementById('presetLabelsContainer');
+            container.innerHTML = '';
+
+            if (availableLabels.length === 0) {
+                container.innerHTML = '<span class="preset-labels-empty">No existing labels found</span>';
+                return;
+            }
+
+            availableLabels.forEach(label => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'preset-label-btn';
+                btn.textContent = label;
+                btn.onclick = () => selectPresetLabel(label);
+                container.appendChild(btn);
+            });
+        }
+
+        function selectPresetLabel(label) {
+            document.getElementById('labelInput').value = label;
+            confirmLabel();
         }
 
         async function confirmLabel() {
@@ -426,6 +537,9 @@
                         const geom = calculateGeometryFromCropRegion(row.crop_region);
                         if (geom) anno.addAnnotation(createAnnotation(geom, row));
                     });
+
+                    // Refresh available labels for next annotation
+                    await fetchAvailableLabels();
                 } else {
                     console.error('Error creating annotation:', result.error);
                 }
@@ -865,6 +979,7 @@
                     if (!geom) return;
                     anno.addAnnotation(createAnnotation(geom, row));
                 });
+                await fetchAvailableLabels();
             } catch (e) {
                 console.error('Error updating annotation coordinates:', e);
             }
@@ -899,7 +1014,7 @@
 
         async function loadGridData() {
             try {
-                const result = await window.pywebview.api.get_all_nodes_for_grid();
+                const result = await window.pywebview.api.get_all_nodes_for_grid();                
                 if (result.success) {
                     display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");                    
                     gridApi.setGridOption('rowData', display_data);                                        
@@ -928,6 +1043,7 @@
                 showResult('loadResult', result, !result.success);
                 if (result.success) {
                     await loadGridData();
+                    await fetchAvailableLabels();
                 }
             } catch (e) {
                 showResult('loadResult', { error: e.message }, true);
