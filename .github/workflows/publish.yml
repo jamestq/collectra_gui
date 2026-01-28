@@ -46,10 +46,29 @@ jobs:
       - name: Install library
         run: poetry install --no-interaction
       - name: Build library
-        run: poetry build
+        run: poetry build      
+      - name: Store the distribution hashFiles
+        uses: actions/upload-artifact@v3
+        with: 
+          name: python-package-distributions
+          path: dist/
+  
+  publish-to-pypi:
+    name: Publish to PyPI
+    if: startwith(github.ref, 'refs/tags/')
+    needs:
+    - build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/collectra_gui/
+    permission:
+      id-token: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with: 
+          name: python-package-distributions  
+          path: dist/        
       - name: Publish library
-        env:
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-        run: |
-          poetry config pypi-token.pypi $PYPI_TOKEN
-          poetry publish
+        uses: pypa/gh-action-pypi-publish@v1
