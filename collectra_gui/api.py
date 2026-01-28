@@ -427,7 +427,7 @@ class Api:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def create_annotation(self, crop_region: dict) -> dict:
+    def create_annotation(self, crop_region: dict, label: str) -> dict:
         """
         Create a new ImageCrop annotation with a Text child.
 
@@ -455,15 +455,14 @@ class Api:
                 return {"success": False, "error": "No root Image node found in graph."}
 
             # Generate unique IDs
-            crop_id = f"user_crop_{uuid.uuid4().hex[:8]}"
-            text_id = f"user_text_{uuid.uuid4().hex[:8]}"
+            crop_id = f"{label}-{uuid.uuid4().hex[:8]}"
 
             if self._yaml_path is None:
                 raise ValueError("YAML path is not set.")
 
             # Create ImageCrop node
             crop_data = {
-                "label": "user_annotation_crop",
+                "label": label,
                 "type": "collectra.ImageCrop",
                 "id": crop_id,
                 "parents": root_image_id,

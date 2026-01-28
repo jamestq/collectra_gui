@@ -120,20 +120,11 @@
         }
         .image-container {
             width: 100%;
-            max-height: 600px;
-            overflow: auto;
+            height: 500px;
+            overflow: hidden;
             background: #f0f0f0;
             border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 200px;
-        }
-        .image-container img {
-            max-width: 100%;
-            height: auto;
-            display: block;
-        }
+        }        
         .image-placeholder {
             color: #999;
             font-style: italic;
@@ -235,15 +226,86 @@
             flex: 1;
             min-width: 0;
         }
+        /* Label Popup Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.visible {
+            display: flex;
+        }
+        .modal-popup {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            min-width: 300px;
+            max-width: 400px;
+        }
+        .modal-popup h3 {
+            margin: 0 0 16px 0;
+            color: #333;
+        }
+        .modal-popup input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        .modal-popup input[type="text"]:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .modal-buttons button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .modal-buttons .btn-cancel {
+            background: #6c757d;
+            color: white;
+        }
+        .modal-buttons .btn-cancel:hover {
+            background: #5a6268;
+        }
+        .modal-buttons .btn-confirm {
+            background: #007bff;
+            color: white;
+        }
+        .modal-buttons .btn-confirm:hover {
+            background: #0056b3;
+        }
     </style>
     <link rel="stylesheet" 
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
       integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" 
       crossorigin="anonymous" 
       referrerpolicy="no-referrer" /> 
-    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>    
-    <script src="https://cdn.jsdelivr.net/npm/@annotorious/annotorious@latest/dist/annotorious.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@annotorious/annotorious@latest/dist/annotorious.css">    
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>        
+    <script src="openseadragon/openseadragon.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/@annotorious/openseadragon@latest/dist/annotorious-openseadragon.js"></script>
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/@annotorious/openseadragon@latest/dist/annotorious-openseadragon.css">    
 </head>
 <body>
     <h1>Annotation Viewer</h1>
@@ -289,6 +351,18 @@
         </div>
     </div>
 
+    <!-- Label Popup Modal -->
+    <div id="labelModal" class="modal-overlay">
+        <div class="modal-popup">
+            <h3>Enter Label Name</h3>
+            <input type="text" id="labelInput" placeholder="Enter label name..." autofocus>
+            <div class="modal-buttons">
+                <button class="btn-cancel" onclick="cancelLabel()">Cancel</button>
+                <button class="btn-confirm" onclick="confirmLabel()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <script>                
 
         let apiReady = false;
@@ -296,10 +370,82 @@
         let selectedYamlPath = '';
         let selectedImageFile = null;
         let anno = null;
+        let viewer = null;
         let syncingSelection = false;
         let graptoFolders = [];
         let currentFolderIndex = -1;
         let sidebarVisible = false;
+        let pendingAnnotation = null;
+
+        function showLabelPopup(annotation) {
+            pendingAnnotation = annotation;
+            const modal = document.getElementById('labelModal');
+            const input = document.getElementById('labelInput');
+            modal.classList.add('visible');
+            input.value = '';
+            input.focus();
+        }
+
+        function hideLabelPopup() {
+            const modal = document.getElementById('labelModal');
+            modal.classList.remove('visible');
+            pendingAnnotation = null;
+        }
+
+        async function confirmLabel() {
+            const input = document.getElementById('labelInput');
+            const label = input.value.trim() || 'Untitled';
+
+            if (!pendingAnnotation) {
+                hideLabelPopup();
+                return;
+            }
+
+            const geometry = pendingAnnotation.target.selector.geometry;
+            const cropRegion = calculateCropRegionFromGeometry(geometry);
+
+            try {
+                const result = await window.pywebview.api.create_annotation(cropRegion, label);
+                if (result.success) {
+                    // Update grid with new data
+                    const display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");
+                    gridApi.setGridOption('rowData', display_data);
+
+                    // Refresh annotations on image
+                    anno.clearAnnotations();
+                    display_data.forEach(row => {
+                        const geom = calculateGeometryFromCropRegion(row.crop_region);
+                        if (geom) anno.addAnnotation(createAnnotation(geom, row));
+                    });
+                } else {
+                    console.error('Error creating annotation:', result.error);
+                }
+            } catch (e) {
+                console.error('Error creating annotation:', e);
+            }
+
+            hideLabelPopup();
+        }
+
+        function cancelLabel() {
+            if (pendingAnnotation && anno) {
+                // Remove the temporary annotation from the canvas
+                anno.removeAnnotation(pendingAnnotation.id);
+            }
+            hideLabelPopup();
+        }
+
+        // Handle keyboard events for the modal
+        document.addEventListener('keydown', function(e) {
+            const modal = document.getElementById('labelModal');
+            if (!modal.classList.contains('visible')) return;
+
+            if (e.key === 'Escape') {
+                cancelLabel();
+            } else if (e.key === 'Enter') {
+                confirmLabel();
+            }
+        });
 
         const updateCellValue = async (params) => {            
             try {
@@ -577,6 +723,7 @@
 
             if (anno) {
                 anno.clearAnnotations();
+                anno = null;
             }
 
             document.getElementById('loadResult').style.display = 'none';
@@ -589,8 +736,25 @@
                 const result = await window.pywebview.api.get_image_base64(imagePath);
                 if (result.success) {
                     const container = document.getElementById('imageContainer');
-                    container.innerHTML = `<img id="uploadedImage" src="${result.data}" alt="Loaded image">`;
-                    anno = Annotorious.createImageAnnotator('uploadedImage');                    
+                    container.innerHTML = '';
+
+                    // Wait for OpenSeadragon to fully load the image
+                    await new Promise((resolve) => {
+                        viewer = OpenSeadragon({
+                            element: container,
+                            prefixUrl: "openseadragon/images/",
+                            tileSources: {
+                                type: 'image',
+                                url: result.data
+                            }
+                        });
+                        viewer.addHandler('open', function() {
+                            console.log('Image loaded into OpenSeadragon');
+                            resolve();
+                        });
+                    });
+
+                    anno = AnnotoriousOSD.createOSDAnnotator(viewer);               
                     anno.setStyle({
                         fill: '#FFEA2E',
                         fillOpacity: 0.1,
@@ -620,29 +784,9 @@
                         const geometry = updated.target.selector.geometry;
                         updateAnnotationCoordinates(updated.id, geometry);
                     });
-                    anno.on('createAnnotation', async function(annotation) {
-                        const geometry = annotation.target.selector.geometry;
-                        const cropRegion = calculateCropRegionFromGeometry(geometry);
-
-                        try {
-                            const result = await window.pywebview.api.create_annotation(cropRegion);
-                            if (result.success) {
-                                // Update grid with new data
-                                const display_data = result.rows.filter(row => row.type === "collectra.ImageCrop");
-                                gridApi.setGridOption('rowData', display_data);
-
-                                // Refresh annotations on image
-                                anno.clearAnnotations();
-                                display_data.forEach(row => {
-                                    const geom = calculateGeometryFromCropRegion(row.crop_region);
-                                    if (geom) anno.addAnnotation(createAnnotation(geom, row));
-                                });
-                            } else {
-                                console.error('Error creating annotation:', result.error);
-                            }
-                        } catch (e) {
-                            console.error('Error creating annotation:', e);
-                        }
+                    anno.on('createAnnotation', function(annotation) {
+                        // Show label popup and store the annotation temporarily
+                        showLabelPopup(annotation);
                     });
                 } else {
                     console.error('Failed to load image:', result.error);
@@ -657,13 +801,16 @@
         function clearImage() {
             const container = document.getElementById('imageContainer');
             container.innerHTML = '<div class="image-placeholder">No image loaded. Select a folder containing an image file.</div>';
+            viewer = null;
+        }
+
+        function getImageSize(){               
+            return [viewer.world._contentSize.x, viewer.world._contentSize.y];
         }
 
         function calculateGeometryFromCropRegion(cropRegion) {
-            if (!cropRegion) return null;
-            const image_div = document.querySelector("#uploadedImage");
-            const imgWidth = image_div.naturalWidth;
-            const imgHeight = image_div.naturalHeight;
+            if (!cropRegion) return null;                    
+            const [imgWidth, imgHeight] = getImageSize();            
             let x = (cropRegion["x_center"] - cropRegion["width_relative"]/2)*imgWidth;
             let y = (cropRegion["y_center"] - cropRegion["height_relative"]/2)*imgHeight;
             let width = cropRegion["width_relative"]*imgWidth;
@@ -672,9 +819,7 @@
         }
 
         function calculateCropRegionFromGeometry(geometry) {
-            const image_div = document.querySelector("#uploadedImage");
-            const imgWidth = image_div.naturalWidth;
-            const imgHeight = image_div.naturalHeight;
+            const [imgWidth, imgHeight] = getImageSize();                        
             const width_relative = geometry.w / imgWidth;
             const height_relative = geometry.h / imgHeight;
             const x_center = (geometry.x / imgWidth) + (width_relative / 2);

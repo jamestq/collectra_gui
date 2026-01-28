@@ -281,7 +281,7 @@ class TestApiCreateAnnotation:
 
     def test_no_graph_loaded(self):
         api = Api()
-        result = api.create_annotation({"x_center": 0.5})
+        result = api.create_annotation({"x_center": 0.5}, "user_crop")
 
         assert result["success"] is False
         assert "No graph loaded" in result["error"]
@@ -300,7 +300,7 @@ class TestApiCreateAnnotation:
             "width_relative": 0.1,
             "height_relative": 0.05,
         }
-        result = api.create_annotation(crop_region)
+        result = api.create_annotation(crop_region, "user_crop")
 
         assert result["success"] is True
         # Should have added 1 node (ImageCrop only, no Text child)
@@ -318,10 +318,10 @@ class TestApiCreateAnnotation:
             "width_relative": 0.1,
             "height_relative": 0.05,
         }
-        api.create_annotation(crop_region)
+        api.create_annotation(crop_region, "user_crop")
 
-        # Find the newly created crop (starts with user_crop_)
-        new_crops = [n for n in api._graph.nodes if n.startswith("user_crop_")]
+        # Find the newly created crop (starts with user_crop-)
+        new_crops = [n for n in api._graph.nodes if n.startswith("user_crop-")]
         assert len(new_crops) == 1
 
         new_crop = new_crops[0]
@@ -573,12 +573,12 @@ class TestApiIntegration:
             "width_relative": 0.1,
             "height_relative": 0.1,
         }
-        create_result = api.create_annotation(crop_region)
+        create_result = api.create_annotation(crop_region, "user_crop")
         assert create_result["success"] is True
         assert len(api._graph.nodes) == initial_count + 1
 
         # Find new crop id
-        new_crop_id = [n for n in api._graph.nodes if n.startswith("user_crop_")][0]
+        new_crop_id = [n for n in api._graph.nodes if n.startswith("user_crop-")][0]
 
         # Create text node by calling update_node_data with empty node_id and crop_id
         create_text_result = api.update_node_data(
@@ -620,10 +620,10 @@ class TestApiCreateAnnotationBehavior:
             "width_relative": 0.1,
             "height_relative": 0.1,
         }
-        api.create_annotation(crop_region)
+        api.create_annotation(crop_region, "user_crop")
 
         # Should only find crop, not text
-        new_crops = [n for n in api._graph.nodes if n.startswith("user_crop_")]
+        new_crops = [n for n in api._graph.nodes if n.startswith("user_crop-")]
         new_texts = [n for n in api._graph.nodes if n.startswith("user_text_")]
         assert len(new_crops) == 1
         assert len(new_texts) == 0
@@ -703,11 +703,11 @@ class TestApiIntegrationCreateCropThenAddText:
             "width_relative": 0.1,
             "height_relative": 0.1,
         }
-        create_result = api.create_annotation(crop_region)
+        create_result = api.create_annotation(crop_region, "user_crop")
         assert create_result["success"] is True
 
         # Get new crop ID
-        new_crop_id = [n for n in api._graph.nodes if n.startswith("user_crop_")][0]
+        new_crop_id = [n for n in api._graph.nodes if n.startswith("user_crop-")][0]
 
         # Add text to crop
         update_result = api.update_node_data("", "Annotation text", crop_id=new_crop_id)
