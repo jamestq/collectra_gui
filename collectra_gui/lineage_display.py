@@ -56,19 +56,23 @@ class CollectraNodeFactory:
 class CollectraNode(BaseModel):
     """Node in the annotation graph."""
 
-    id: str
+    label: str
     type: str
-    data: str = ""
-    label: str = ""  # Added for label lookup
+    id: str
     parents: list[str] = []
+    data: str = ""
+    embeddings: list[str] = []
+    orientation: str = "north"
 
     def model_dump(self, *args, **kwargs) -> dict[str, str | float]:
         data = super().model_dump(*args, **kwargs)
         label = data.pop("label", None)  # Exclude label from dump
-        if "parents" in data:
+        if data["parents"]:
             data["parents"] = (
                 data["parents"][0] if len(data["parents"]) == 1 else data["parents"]
             )
+        else:
+            data.pop("parents", None)
         if label is None:
             raise ValueError("Label is missing from node data.")
         return data

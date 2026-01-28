@@ -495,14 +495,13 @@
         }
 
         const columnDefs = [
-            { field: "id", headerName: "Node ID", filter: true, sortable: true, flex: 1 },
-            { field: "type", headerName: "Type", filter: true, sortable: true, flex: 1 },
+            { field: "id", headerName: "Node ID", filter: true, sortable: true, flex: 1 },            
             {
                 field: "displayValue",
                 headerName: "Display Value",
                 filter: true,
                 sortable: true,
-                flex: 3,
+                flex: 2,
                 editable: (params) => !params.data.locked,
                 onCellValueChanged: updateCellValue,
                 cellEditor: 'agLargeTextCellEditor',
@@ -645,7 +644,10 @@
                     <span class="folder-icon"><i class="fa fa-folder"></i></span>
                     <span class="folder-name" title="${folder.name}">${folder.name}</span>
                 `;
-                li.onclick = () => loadGraptoFolder(index);
+                li.onclick = () => {
+                    clearCurrentView();
+                    loadGraptoFolder(index);
+                };
                 listEl.appendChild(li);
             });
         }
@@ -732,6 +734,7 @@
 
             if (anno) {
                 anno.clearAnnotations();
+                anno.destroy();
                 anno = null;
             }
 
@@ -769,7 +772,8 @@
                     });
 
                     anno = AnnotoriousOSD.createOSDAnnotator(viewer, {
-                        drawingEnabled: true,                          
+                        drawingEnabled: true, 
+                        autoSave: true                         
                     });               
                     anno.setStyle({
                         fill: '#FFEA2E',
@@ -817,6 +821,7 @@
         function clearImage() {
             const container = document.getElementById('imageContainer');
             container.innerHTML = '<div class="image-placeholder">No image loaded. Select a folder containing an image file.</div>';
+            viewer?.destroy();
             viewer = null;
         }
 
