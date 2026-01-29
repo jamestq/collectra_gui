@@ -56,6 +56,7 @@ class Api:
         self._grapto_folders: list[dict] = []
         self._parent_folder: str | None = None
         self._global_labels: set[str] = set()
+        self._global_label_counts: dict[str, int] = {}  # {label: total_count}
 
     def set_window(self, window):
         """Store the window reference for use in dialogs."""
@@ -189,10 +190,33 @@ class Api:
                 for i, f in enumerate(self._grapto_folders)
             ]
 
+            # Compute aggregate label statistics across all folders
+            self._global_label_counts = {}
+            for folder in self._grapto_folders:
+                try:
+                    with open(folder["yaml_path"], "r") as f:
+                        yaml_data = yaml.safe_load(f)
+                    temp_graph = CollectraGraph.from_yaml_data(yaml_data)
+                    label_counts = temp_graph.count_nodes_by_label(
+                        type_filter="collectra.ImageCrop"
+                    )
+                    # Accumulate unique labels
+                    self._global_labels.update(temp_graph.get_unique_labels())
+                    # Accumulate counts
+                    for label, count in label_counts.items():
+                        self._global_label_counts[label] = (
+                            self._global_label_counts.get(label, 0) + count
+                        )
+                except Exception:
+                    # Skip folders that can't be loaded
+                    pass
+
             return {
                 "success": True,
                 "parent_path": str(parent_path),
                 "folders": folders,
+                "global_label_counts": self._global_label_counts,
+                "global_total": sum(self._global_label_counts.values()),
             }
 
         except Exception as e:
@@ -370,6 +394,40 @@ class Api:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def get_label_statistics(self) -> dict:
+        """
+        Return counts of nodes per label in current graph.
+
+        Returns:
+            dict with 'success', 'label_counts', and 'total'
+        """
+        if self._graph is None:
+            return {"success": False, "error": "No graph loaded"}
+
+        # Count only ImageCrop types (annotations visible in grid)
+        label_counts = self._graph.count_nodes_by_label(
+            type_filter="collectra.ImageCrop"
+        )
+
+        return {
+            "success": True,
+            "label_counts": label_counts,
+            "total": sum(label_counts.values()),
+        }
+
+    def get_global_label_statistics(self) -> dict:
+        """
+        Return aggregated label counts across all files in parent folder.
+
+        Returns:
+            dict with 'success', 'label_counts', and 'total'
+        """
+        return {
+            "success": True,
+            "label_counts": self._global_label_counts,
+            "total": sum(self._global_label_counts.values()),
+        }
+
     def get_all_nodes_for_grid(self) -> dict:
         """
         Return all nodes formatted for AG Grid rows.
@@ -471,6 +529,13 @@ class Api:
             if root_image_id is None:
                 return {"success": False, "error": "No root Image node found in graph."}
 
+            orientation = "north"
+
+            if parent_id:
+                parent_node = self._graph.get_node(parent_id)
+                if parent_node:
+                    orientation = parent_node.orientation
+
             # Generate unique IDs
             crop_id = f"{label}-{uuid.uuid4().hex[:8]}"
 
@@ -483,14 +548,25 @@ class Api:
                 "type": "collectra.ImageCrop",
                 "id": crop_id,
                 "parents": parent_id if parent_id else root_image_id,
+                "orientation": orientation,
                 "data": Path(self._yaml_path).parent.name.replace(".yaml", ".jpg"),
                 **crop_region,
             }
             self._graph.add_node(crop_data)
             self._global_labels.add(label)
+            # Update global label counts if in parent folder mode
+            if self._grapto_folders:
+                self._global_label_counts[label] = (
+                    self._global_label_counts.get(label, 0) + 1
+                )
             # Save and return updated grid
             self._save_to_yaml()
-            return self.get_all_nodes_for_grid()
+            result = self.get_all_nodes_for_grid()
+            # Include updated global stats in response
+            if self._grapto_folders:
+                result["global_label_counts"] = self._global_label_counts
+                result["global_total"] = sum(self._global_label_counts.values())
+            return result
 
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -509,6 +585,10 @@ class Api:
             return {"success": False, "error": "No graph loaded. Call load_yaml first."}
 
         try:
+            # Get the label before deleting (for updating global counts)
+            node = self._graph.get_node(node_id)
+            deleted_label = node.label if node else None
+
             # Get all Text children before deleting the ImageCrop
             text_children = self._graph.children_of_type(node_id, "Text")
 
@@ -519,9 +599,21 @@ class Api:
             # Delete the ImageCrop node
             self._graph.remove_node(node_id)
 
+            # Update global label counts if in parent folder mode
+            if self._grapto_folders and deleted_label:
+                if deleted_label in self._global_label_counts:
+                    self._global_label_counts[deleted_label] -= 1
+                    if self._global_label_counts[deleted_label] <= 0:
+                        del self._global_label_counts[deleted_label]
+
             # Save and return updated grid
             self._save_to_yaml()
-            return self.get_all_nodes_for_grid()
+            result = self.get_all_nodes_for_grid()
+            # Include updated global stats in response
+            if self._grapto_folders:
+                result["global_label_counts"] = self._global_label_counts
+                result["global_total"] = sum(self._global_label_counts.values())
+            return result
 
         except Exception as e:
             return {"success": False, "error": str(e)}

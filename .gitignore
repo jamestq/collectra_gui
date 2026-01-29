@@ -365,3 +365,6 @@ vite.config.ts.timestamp-*
 
 # Pyenv
 .python-version
+
+# Mac
+*/.DS_Store

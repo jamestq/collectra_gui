@@ -348,6 +348,55 @@
         .custom-label-divider::after {
             margin-left: 10px;
         }
+        /* Global Stats Panel Styles */
+        .stats-panel {
+            display: none;
+            background: #fff;
+            border-bottom: 1px solid #ddd;
+            padding: 12px 15px;
+        }
+        .stats-panel.visible {
+            display: block;
+        }
+        .stats-header {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .stats-content {
+            font-size: 12px;
+        }
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .stats-item:last-child {
+            border-bottom: none;
+        }
+        .stats-label {
+            color: #555;
+        }
+        .stats-count {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stats-total {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 2px solid #eee;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+        .stats-total .stats-count {
+            color: #28a745;
+        }
     </style>
     <link rel="stylesheet" 
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
@@ -376,6 +425,14 @@
                 <button class="sidebar-toggle" onclick="toggleSidebar()" title="Hide sidebar">
                     <i class="fa fa-chevron-left"></i>
                 </button>
+            </div>
+            <div id="globalStatsPanel" class="stats-panel">
+                <div class="stats-header">
+                    <span>Label Statistics</span>
+                </div>
+                <div id="globalStatsContent" class="stats-content">
+                    <!-- Label counts populated dynamically -->
+                </div>
             </div>
             <ul id="folderList" class="sidebar-list"></ul>
         </aside>
@@ -440,6 +497,50 @@
         let sidebarVisible = false;
         let pendingAnnotation = null;
         let availableLabels = [];
+
+        function formatLabelCounts(labelCounts) {
+            const entries = Object.entries(labelCounts);
+            if (entries.length === 0) {
+                return '<span class="file-missing">No annotations found</span>';
+            }
+            return entries
+                .sort((a, b) => b[1] - a[1])  // Sort by count descending
+                .map(([label, count]) => `<span class="file-found">${label}: ${count}</span>`)
+                .join('<br>');
+        }
+
+        function displayGlobalStats(labelCounts, total) {
+            const panel = document.getElementById('globalStatsPanel');
+            const content = document.getElementById('globalStatsContent');
+
+            if (!labelCounts || Object.keys(labelCounts).length === 0) {
+                panel.classList.remove('visible');
+                return;
+            }
+
+            const entries = Object.entries(labelCounts).sort((a, b) => b[1] - a[1]);
+            let html = '';
+
+            entries.forEach(([label, count]) => {
+                html += `<div class="stats-item">
+                    <span class="stats-label">${label}</span>
+                    <span class="stats-count">${count}</span>
+                </div>`;
+            });
+
+            html += `<div class="stats-total">
+                <span>Total</span>
+                <span class="stats-count">${total}</span>
+            </div>`;
+
+            content.innerHTML = html;
+            panel.classList.add('visible');
+        }
+
+        function hideGlobalStats() {
+            const panel = document.getElementById('globalStatsPanel');
+            panel.classList.remove('visible');
+        }
 
         function showLabelPopup(annotation) {
             pendingAnnotation = annotation;
@@ -538,6 +639,11 @@
                         if (geom) anno.addAnnotation(createAnnotation(geom, row));
                     });
 
+                    // Update global stats if in parent folder mode
+                    if (graptoFolders.length > 0 && result.global_label_counts) {
+                        displayGlobalStats(result.global_label_counts, result.global_total);
+                    }
+
                     // Refresh available labels for next annotation
                     await fetchAvailableLabels();
                 } else {
@@ -598,6 +704,11 @@
                         const geom = calculateGeometryFromCropRegion(row.crop_region);
                         if (geom) anno.addAnnotation(createAnnotation(geom, row));
                     });
+
+                    // Update global stats if in parent folder mode
+                    if (graptoFolders.length > 0 && result.global_label_counts) {
+                        displayGlobalStats(result.global_label_counts, result.global_total);
+                    }
                 } else {
                     console.error('Error deleting annotation:', result.error);
                     alert('Failed to delete: ' + result.error);
@@ -682,33 +793,39 @@
                     return;
                 }
 
-                const folderInfoEl = document.getElementById('folderInfo');
-                const folderName = result.folder_path.split(/[/\\]/).pop();
-                let infoHtml = `<strong>Folder:</strong> ${folderName}<br>`;
+                // Clear parent folder mode when selecting a single folder
+                graptoFolders = [];
+                currentFolderIndex = -1;
+                hideSidebar();
+                hideGlobalStats();
 
-                if (result.yaml_path) {
-                    const yamlName = result.yaml_path.split(/[/\\]/).pop();
-                    infoHtml += `<span class="file-found">YAML found: ${yamlName}</span><br>`;
-                    document.getElementById('yamlPath').value = result.yaml_path;
-                    selectedYamlPath = result.yaml_path;
-                } else {
-                    infoHtml += `<span class="file-missing">No YAML file found</span><br>`;
-                }
+                const folderInfoEl = document.getElementById('folderInfo');
+                let infoHtml = `<strong>Path:</strong> ${result.folder_path}<br>`;
 
                 if (result.image_path) {
-                    const imageName = result.image_path.split(/[/\\]/).pop();
-                    infoHtml += `<span class="file-found">Image found: ${imageName}</span>`;
                     await displayImageFromPath(result.image_path);
                 } else {
-                    infoHtml += `<span class="file-missing">No image file found</span>`;
                     clearImage();
                 }
 
-                folderInfoEl.innerHTML = infoHtml;
-
                 if (result.yaml_path) {
+                    document.getElementById('yamlPath').value = result.yaml_path;
+                    selectedYamlPath = result.yaml_path;
                     await loadYaml();
+
+                    // Fetch and display label statistics
+                    const stats = await window.pywebview.api.get_label_statistics();
+                    if (stats.success && Object.keys(stats.label_counts).length > 0) {
+                        infoHtml += '<strong>Labels:</strong><br>';
+                        infoHtml += formatLabelCounts(stats.label_counts);
+                    } else {
+                        infoHtml += '<span class="file-missing">No annotations found</span>';
+                    }
+                } else {
+                    infoHtml += '<span class="file-missing">No YAML file found</span>';
                 }
+
+                folderInfoEl.innerHTML = infoHtml;
 
             } catch (e) {
                 showResult('loadResult', { error: e.message }, true);
@@ -737,6 +854,11 @@
                 populateSidebar(result.folders);
                 showSidebar();
                 clearCurrentView();
+
+                // Display global label statistics
+                if (result.global_label_counts) {
+                    displayGlobalStats(result.global_label_counts, result.global_total);
+                }
 
                 const folderInfoEl = document.getElementById('folderInfo');
                 folderInfoEl.innerHTML = `<strong>Parent folder:</strong> ${result.folders.length} .grapto folders found`;
@@ -791,27 +913,28 @@
                 currentItem.classList.add('active');
 
                 const folderInfoEl = document.getElementById('folderInfo');
-                const folderName = result.folder_name;
-                let infoHtml = `<strong>Folder:</strong> ${folderName}<br>`;
-
-                if (result.yaml_path) {
-                    const yamlName = result.yaml_path.split(/[/\\]/).pop();
-                    infoHtml += `<span class="file-found">YAML: ${yamlName}</span><br>`;
-                    document.getElementById('yamlPath').value = result.yaml_path;
-                    selectedYamlPath = result.yaml_path;
-                }
+                let infoHtml = `<strong>Path:</strong> ${result.folder_path}<br>`;
 
                 if (result.image_path) {
-                    const imageName = result.image_path.split(/[/\\]/).pop();
-                    infoHtml += `<span class="file-found">Image: ${imageName}</span>`;
                     await displayImageFromPath(result.image_path);
                 }
 
-                folderInfoEl.innerHTML = infoHtml;
-
                 if (result.yaml_path) {
+                    document.getElementById('yamlPath').value = result.yaml_path;
+                    selectedYamlPath = result.yaml_path;
                     await loadYaml();
+
+                    // Fetch and display label statistics
+                    const stats = await window.pywebview.api.get_label_statistics();
+                    if (stats.success && Object.keys(stats.label_counts).length > 0) {
+                        infoHtml += '<strong>Labels:</strong><br>';
+                        infoHtml += formatLabelCounts(stats.label_counts);
+                    } else {
+                        infoHtml += '<span class="file-missing">No annotations found</span>';
+                    }
                 }
+
+                folderInfoEl.innerHTML = infoHtml;
 
             } catch (e) {
                 showResult('loadResult', { error: e.message }, true);

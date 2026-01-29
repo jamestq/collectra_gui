@@ -177,19 +177,19 @@ class CollectraGraph:
         """Get immediate parents of a node."""
         return list(self._graph.predecessors(node_id))
 
-    def _get_node(self, node_id: str) -> CollectraNode | None:
+    def get_node(self, node_id: str) -> CollectraNode | None:
         """Get the AnnotationNode object for a given node ID."""
         node = self._graph.nodes.get(node_id, {}).get("node", None)
         return node
 
     def get_type(self, node_id: str) -> str:
         """Get type of a node."""
-        node = self._get_node(node_id)
+        node = self.get_node(node_id)
         return node.type if node else ""
 
     def get_data(self, node_id: str) -> str:
         """Get data field of a node."""
-        node = self._get_node(node_id)
+        node = self.get_node(node_id)
         return node.data if node else ""
 
     def get_crop_region(self, node_id: str) -> dict[str, float]:
@@ -205,7 +205,7 @@ class CollectraGraph:
         Raises:
             ValueError: If node is missing crop region fields
         """
-        node = self._get_node(node_id)
+        node = self.get_node(node_id)
         if not isinstance(node, CollectraAnnotationNode):
             raise ValueError(f"Node {node_id} is not an annotation node.")
 
@@ -215,15 +215,25 @@ class CollectraGraph:
         """Get all unique labels from nodes in the graph."""
         labels = set()
         for node_id in self._graph.nodes:
-            node = self._get_node(node_id)
+            node = self.get_node(node_id)
             if node and node.label:
                 labels.add(node.label)
         return sorted(labels)
 
+    def count_nodes_by_label(self, type_filter: str = None) -> dict[str, int]:
+        """Count nodes grouped by label, optionally filtered by type."""
+        counts = {}
+        for node_id in self._graph.nodes:
+            node = self.get_node(node_id)
+            if node and node.label:
+                if type_filter is None or node.type == type_filter:
+                    counts[node.label] = counts.get(node.label, 0) + 1
+        return counts
+
     def set_data(self, node_id: str, data: str, crop_id: str | None = None) -> None:
         """Set data field of a node."""
         if node_id:
-            node = self._get_node(node_id)
+            node = self.get_node(node_id)
             if node is None:
                 raise ValueError(f"Node {node_id} not found in graph.")
             node.data = data
@@ -241,7 +251,7 @@ class CollectraGraph:
 
     def set_crop_region(self, node_id: str, crop_region: dict[str, float]) -> None:
         """Set crop region fields of a node (x_center, y_center, width_relative, height_relative)."""
-        node = self._get_node(node_id)
+        node = self.get_node(node_id)
         crop: CollectraCropRegion = CollectraCropRegion(**crop_region)
         if not isinstance(node, CollectraAnnotationNode):
             raise ValueError(f"Node {node_id} is not an annotation node.")
@@ -298,7 +308,7 @@ class CollectraGraph:
         yaml_data: dict = {}
 
         for node_id in self._graph.nodes:
-            node = self._get_node(node_id)
+            node = self.get_node(node_id)
             if node is None:
                 continue
             node_data = node.model_dump()
@@ -328,7 +338,7 @@ class CollectraGraph:
         Returns:
             NodeDisplayValue with value, source_id, crop_region, reason
         """
-        if self._get_node(node_id) is None:
+        if self.get_node(node_id) is None:
             return NodeDisplayValue(reason=f"{node_id} Element not found")
 
         node_type = self.get_type(node_id)
