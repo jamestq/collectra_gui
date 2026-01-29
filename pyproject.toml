@@ -1,6 +1,6 @@
 [project]
 name = "collectra_gui"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = [
     {name = "James Q",email = "james.quang@pm.me"}

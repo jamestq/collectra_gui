@@ -404,9 +404,12 @@
       crossorigin="anonymous" 
       referrerpolicy="no-referrer" /> 
     <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>        
-    <script src="https://cdn.jsdelivr.net/npm/openseadragon@latest/build/openseadragon/openseadragon.min.js"></script>    
-    <script src="https://cdn.jsdelivr.net/npm/@annotorious/openseadragon@latest/dist/annotorious-openseadragon.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@annotorious/openseadragon@latest/dist/annotorious-openseadragon.css">    
+    <script src="https://cdn.jsdelivr.net/npm/openseadragon@5.0/build/openseadragon/openseadragon.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/@annotorious/openseadragon@latest/dist/annotorious-openseadragon.js"></script>
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/@annotorious/openseadragon@latest/dist/annotorious-openseadragon.css">    
 </head>
 <body>
     <h1>Annotation Viewer</h1>
@@ -987,7 +990,8 @@
                     // Wait for OpenSeadragon to fully load the image
                     await new Promise((resolve) => {
                         viewer = OpenSeadragon({
-                            element: container,                            
+                            element: container,
+                            prefixUrl: "https://cdn.jsdelivr.net/npm/openseadragon@5.0/build/openseadragon/images/",
                             tileSources: {
                                 type: 'image',
                                 url: result.data
