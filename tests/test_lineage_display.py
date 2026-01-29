@@ -480,7 +480,7 @@ class TestNodeNormalization:
         empty_graph.add_node(
             {"label": "l2", "type": "t", "id": "child", "parents": ["parent"]}
         )
-        node = empty_graph._get_node("child")
+        node = empty_graph.get_node("child")
         dumped = node.model_dump()
         assert dumped["parents"] == "parent"  # String, not list
 
